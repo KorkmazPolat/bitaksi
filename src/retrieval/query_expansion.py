@@ -5,12 +5,12 @@ to increase recall in the vector store.
 """
 from __future__ import annotations
 
-import json
-
-import anthropic
+import logging
 
 from src.config import get_settings
+from src.utils.llm import llm_call, parse_llm_json
 
+logger = logging.getLogger(__name__)
 
 EXPANSION_PROMPT = """\
 You are an HR knowledge assistant. Rewrite the following employee question
@@ -29,32 +29,23 @@ class QueryExpander:
 
     def __init__(self, n_variants: int = 3):
         settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.llm_model
         self.n = n_variants
 
     def expand(self, query: str) -> list[str]:
         """Returns [original_query] + expanded variants (deduped)."""
         try:
-            response = self.client.messages.create(
+            response = llm_call(
                 model=self.model,
                 max_tokens=512,
                 messages=[
                     {
                         "role": "user",
-                        "content": EXPANSION_PROMPT.format(
-                            query=query, n=self.n
-                        ),
+                        "content": EXPANSION_PROMPT.format(query=query, n=self.n),
                     }
                 ],
             )
-            text = response.content[0].text.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            variants = json.loads(text)
-            # Deduplicate while preserving order; keep original first
+            variants = parse_llm_json(response.content[0].text)
             seen = {query}
             result = [query]
             for v in variants:
@@ -63,5 +54,5 @@ class QueryExpander:
                     result.append(v)
             return result
         except Exception as exc:
-            print(f"[QueryExpander] Failed: {exc}")
+            logger.warning("Query expansion failed: %s", exc)
             return [query]

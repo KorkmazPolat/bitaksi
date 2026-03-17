@@ -15,12 +15,27 @@ class Settings(BaseSettings):
 
     top_k: int = 5
     similarity_threshold: float = 0.6
+    relatives_score_threshold: float = 0.5   # lower bar for Q→chunk matching
     fallback_top_k: int = 8
 
     chunk_size: int = 800
     chunk_overlap: int = 100
 
     eval_recall_k: int = 5
+
+    # Ingestion
+    batch_upsert_size: int = 100
+    docx_page_paragraph_count: int = 50
+    min_chunk_length_for_relatives: int = 50
+    chunk_preview_length: int = 1500        # chars sent to relative-question LLM
+
+    # Generation
+    max_history_turns: int = 6
+    max_query_length: int = 2000
+    max_upload_size_mb: int = 100
+
+    # Evaluation
+    faithfulness_context_limit: int = 4000
 
     class Config:
         env_file = ".env"

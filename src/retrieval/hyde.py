@@ -2,14 +2,15 @@
 HyDE – Hypothetical Document Embeddings (Fallback Step 2):
 Generates a hypothetical HR policy answer for the query,
 then retrieves using that synthetic document as the query embedding.
-This bridges the gap between question-style queries and passage-style docs.
 """
 from __future__ import annotations
 
-import anthropic
+import logging
 
 from src.config import get_settings
+from src.utils.llm import llm_call
 
+logger = logging.getLogger(__name__)
 
 HYDE_PROMPT = """\
 You are writing a snippet from an HR policy document that directly answers
@@ -28,23 +29,19 @@ class HyDERetrieval:
 
     def __init__(self):
         settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.llm_model
 
     def generate_hypothesis(self, query: str) -> str:
         """Returns a synthetic HR policy passage for the query."""
         try:
-            response = self.client.messages.create(
+            response = llm_call(
                 model=self.model,
                 max_tokens=300,
                 messages=[
-                    {
-                        "role": "user",
-                        "content": HYDE_PROMPT.format(query=query),
-                    }
+                    {"role": "user", "content": HYDE_PROMPT.format(query=query)}
                 ],
             )
             return response.content[0].text.strip()
         except Exception as exc:
-            print(f"[HyDE] Hypothesis generation failed: {exc}")
-            return query  # fall back to original query
+            logger.warning("HyDE hypothesis generation failed: %s", exc)
+            return query

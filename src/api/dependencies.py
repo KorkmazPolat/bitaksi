@@ -4,14 +4,15 @@ FastAPI dependency injection: shared service instances.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
 from src.config import get_settings
+from src.generation.response_generator import GenerationResult, ResponseGenerator
 from src.retrieval.retriever import BaseRetriever
 from src.retrieval.smart_grounding import SmartGroundingRetriever
-from src.generation.response_generator import GenerationResult, ResponseGenerator
 
 
 class ChatService:
@@ -25,7 +26,11 @@ class ChatService:
         self.grounding = grounding
         self.generator = generator
 
-    def answer(self, query: str, history=None) -> GenerationResult:
+    def answer(
+        self,
+        query: str,
+        history=None,
+    ) -> GenerationResult:
         retrieval_result = self.grounding.retrieve(query)
         return self.generator.generate(
             query=query,
@@ -34,16 +39,14 @@ class ChatService:
         )
 
 
-@lru_cache()
+@lru_cache(maxsize=1)
 def _build_service() -> ChatService:
     settings = get_settings()
     embedding_fn = SentenceTransformerEmbeddingFunction(
         model_name=settings.embedding_model
     )
 
-    from pathlib import Path
     Path(settings.chroma_persist_dir).mkdir(parents=True, exist_ok=True)
-
     chroma_client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
 
     raw_col = chroma_client.get_or_create_collection(
@@ -65,7 +68,7 @@ def _build_service() -> ChatService:
     relatives_retriever = BaseRetriever(
         collection=relatives_col,
         top_k=settings.top_k,
-        score_threshold=0.5,
+        score_threshold=settings.relatives_score_threshold,
     )
 
     grounding = SmartGroundingRetriever(

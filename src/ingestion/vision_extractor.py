@@ -1,15 +1,16 @@
 """
 Vision extractor: uses a vision LLM (Claude) to extract structured content
 from page images — tables, figures, charts — that plain text parsing misses.
-The extracted content is stored alongside the raw text chunks.
 """
 from __future__ import annotations
 
-import anthropic
+import logging
 
 from src.config import get_settings
 from src.ingestion.document_processor import DocumentPage
+from src.utils.llm import get_anthropic_client, parse_llm_json
 
+logger = logging.getLogger(__name__)
 
 VISION_PROMPT = """\
 You are an expert at analyzing document pages for an HR knowledge base.
@@ -40,7 +41,6 @@ class VisionExtractor:
 
     def __init__(self):
         settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.vision_model
 
     def extract(self, page: DocumentPage) -> dict:
@@ -52,7 +52,8 @@ class VisionExtractor:
             return self._empty_result()
 
         try:
-            response = self.client.messages.create(
+            client = get_anthropic_client()
+            response = client.messages.create(
                 model=self.model,
                 max_tokens=2048,
                 messages=[
@@ -72,20 +73,12 @@ class VisionExtractor:
                     }
                 ],
             )
-
-            import json
-            text = response.content[0].text.strip()
-            # Strip markdown code fences if present
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            return json.loads(text)
-
+            return parse_llm_json(response.content[0].text)
         except Exception as exc:
-            # Non-fatal: log and return empty result
-            print(f"[VisionExtractor] Warning: extraction failed for page "
-                  f"{page.doc_id}:{page.page_num} — {exc}")
+            logger.warning(
+                "Vision extraction failed for %s page %d: %s",
+                page.doc_id, page.page_num, exc,
+            )
             return self._empty_result()
 
     def build_visual_text(self, extraction: dict) -> str:

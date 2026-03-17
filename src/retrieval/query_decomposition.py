@@ -5,12 +5,12 @@ retrieves for each, and merges results.
 """
 from __future__ import annotations
 
-import json
-
-import anthropic
+import logging
 
 from src.config import get_settings
+from src.utils.llm import llm_call, parse_llm_json
 
+logger = logging.getLogger(__name__)
 
 DECOMP_PROMPT = """\
 You are an HR knowledge assistant. The following employee question may contain
@@ -29,29 +29,20 @@ class QueryDecomposer:
 
     def __init__(self):
         settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.llm_model
 
     def decompose(self, query: str) -> list[str]:
         """Returns a list of sub-questions (may be just [query] if simple)."""
         try:
-            response = self.client.messages.create(
+            response = llm_call(
                 model=self.model,
                 max_tokens=400,
                 messages=[
-                    {
-                        "role": "user",
-                        "content": DECOMP_PROMPT.format(query=query),
-                    }
+                    {"role": "user", "content": DECOMP_PROMPT.format(query=query)}
                 ],
             )
-            text = response.content[0].text.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            sub_questions = json.loads(text)
+            sub_questions = parse_llm_json(response.content[0].text)
             return sub_questions if sub_questions else [query]
         except Exception as exc:
-            print(f"[QueryDecomposer] Failed: {exc}")
+            logger.warning("Query decomposition failed: %s", exc)
             return [query]

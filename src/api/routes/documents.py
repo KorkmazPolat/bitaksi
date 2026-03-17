@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from src.config import get_settings
 from src.ingestion.indexer import DocumentIndexer
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -29,15 +30,26 @@ class IngestResponse(BaseModel):
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest_document(file: UploadFile = File(...)):
     """Upload and index an HR document (PDF or DOCX)."""
+    settings = get_settings()
     suffix = Path(file.filename or "").suffix.lower()
+
     if suffix not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type '{suffix}'. Allowed: {ALLOWED_EXTENSIONS}",
+            detail=f"Unsupported file type '{suffix}'. Allowed: {sorted(ALLOWED_EXTENSIONS)}",
+        )
+
+    # Enforce file size limit
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    content = await file.read()
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum size of {settings.max_upload_size_mb} MB.",
         )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        shutil.copyfileobj(file.file, tmp)
+        tmp.write(content)
         tmp_path = tmp.name
 
     try:

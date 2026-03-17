@@ -4,10 +4,12 @@ Chat routes: the main employee-facing chat endpoint.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from src.api.dependencies import get_chat_service
+from src.config import get_settings
 from src.generation.response_generator import ChatMessage
+from src.utils.enums import MessageRole
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -15,7 +17,18 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 class ChatRequest(BaseModel):
     query: str
     session_id: str = "default"
-    history: list[dict] = []  # [{"role": "user"|"assistant", "content": "..."}]
+    history: list[dict] = []
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Query cannot be empty.")
+        max_len = get_settings().max_query_length
+        if len(v) > max_len:
+            raise ValueError(f"Query exceeds maximum length of {max_len} characters.")
+        return v
 
 
 class SourceRef(BaseModel):
@@ -38,13 +51,11 @@ async def chat(
     request: ChatRequest,
     service=Depends(get_chat_service),
 ):
-    if not request.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty.")
-
+    valid_roles = {MessageRole.USER, MessageRole.ASSISTANT}
     history = [
         ChatMessage(role=m["role"], content=m["content"])
         for m in request.history
-        if m.get("role") in {"user", "assistant"}
+        if m.get("role") in valid_roles
     ]
 
     result = service.answer(query=request.query, history=history)

@@ -5,6 +5,7 @@ Verifies fallback chain ordering and deduplication.
 from unittest.mock import MagicMock, patch
 from src.retrieval.retriever import RetrievedChunk
 from src.retrieval.smart_grounding import SmartGroundingRetriever, RetrievalResult
+from src.utils.enums import RetrievalStrategy
 
 
 def _make_chunk(chunk_id: str, score: float = 0.9) -> RetrievedChunk:
@@ -21,8 +22,7 @@ def _make_chunk(chunk_id: str, score: float = 0.9) -> RetrievedChunk:
 def _make_retriever(chunks: list[RetrievedChunk]) -> MagicMock:
     mock = MagicMock()
     mock.retrieve.return_value = chunks
-    mock.collection = MagicMock()
-    mock.collection.get.return_value = {"documents": [], "metadatas": []}
+    mock.fetch_by_ids.return_value = []
     return mock
 
 
@@ -41,7 +41,7 @@ def test_direct_retrieval_success():
         grounding = SmartGroundingRetriever(raw, relatives)
         result = grounding.retrieve("yıllık izin kaç gün?")
 
-    assert result.strategy_used == "direct"
+    assert result.strategy_used == RetrievalStrategy.DIRECT
     assert result.grounded is True
     assert len(result.chunks) == 2
 
@@ -61,8 +61,7 @@ def test_fallback_to_expansion():
 
     raw = MagicMock()
     raw.retrieve.side_effect = side_effect
-    raw.collection = MagicMock()
-    raw.collection.get.return_value = {"documents": [], "metadatas": []}
+    raw.fetch_by_ids.return_value = []
     relatives = _make_retriever([])
 
     with patch("src.retrieval.smart_grounding.get_settings") as mock_settings, \
@@ -76,14 +75,17 @@ def test_fallback_to_expansion():
         s.fallback_top_k = 8
         mock_settings.return_value = s
 
-        expander_instance = MagicMock()
-        expander_instance.expand.return_value = ["original query", "expanded query"]
-        MockExpander.return_value = expander_instance
+        MockExpander.return_value.expand.return_value = ["original query", "expanded query"]
 
         grounding = SmartGroundingRetriever(raw, relatives)
         result = grounding.retrieve("izin politikası")
 
-    assert result.strategy_used in {"expansion", "hyde", "decomposition", "direct"}
+    assert result.strategy_used in {
+        RetrievalStrategy.EXPANSION,
+        RetrievalStrategy.HYDE,
+        RetrievalStrategy.DECOMPOSITION,
+        RetrievalStrategy.DIRECT,
+    }
 
 
 def test_no_grounded_result():

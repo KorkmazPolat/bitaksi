@@ -10,14 +10,16 @@ Key design decisions:
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import anthropic
+from typing import Literal
 
 from src.config import get_settings
 from src.retrieval.smart_grounding import RetrievalResult
+from src.utils.llm import llm_call
 
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 Sen bir İK (İnsan Kaynakları) Bilgi Asistanısın. Görevin, kurum içi İK \
@@ -51,17 +53,19 @@ Lütfen sorunuzu farklı şekilde ifade etmeyi deneyin veya \
 doğrudan **İK departmanıyla** iletişime geçin.
 """
 
+_UNKNOWN_DOC = "Bilinmeyen Doküman"
+
 
 @dataclass
 class ChatMessage:
-    role: str   # "user" | "assistant"
+    role: Literal["user", "assistant"]
     content: str
 
 
 @dataclass
 class GenerationResult:
     answer: str
-    sources: list[dict]          # [{doc, page, section}]
+    sources: list[dict]          # [{document, page, section, score}]
     strategy_used: str
     grounded: bool
     queries_tried: list[str] = field(default_factory=list)
@@ -72,8 +76,8 @@ class ResponseGenerator:
 
     def __init__(self):
         settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.llm_model
+        self.max_history_turns = settings.max_history_turns
 
     def generate(
         self,
@@ -86,29 +90,27 @@ class ResponseGenerator:
             return GenerationResult(
                 answer=NO_CONTEXT_MSG,
                 sources=[],
-                strategy_used="none",
+                strategy_used=str(retrieval_result.strategy_used),
                 grounded=False,
                 queries_tried=retrieval_result.queries_tried,
             )
 
         context_block = self._format_context(retrieval_result.chunks)
         sources = self._extract_sources(retrieval_result.chunks)
-
         messages = self._build_messages(query, context_block, history or [])
 
-        response = self.client.messages.create(
+        response = llm_call(
             model=self.model,
             max_tokens=1500,
             system=SYSTEM_PROMPT,
             messages=messages,
         )
-
         answer = response.content[0].text.strip()
 
         return GenerationResult(
             answer=answer,
             sources=sources,
-            strategy_used=retrieval_result.strategy_used,
+            strategy_used=str(retrieval_result.strategy_used),
             grounded=True,
             queries_tried=retrieval_result.queries_tried,
         )
@@ -119,7 +121,7 @@ class ResponseGenerator:
     def _format_context(chunks) -> str:
         parts: list[str] = []
         for i, chunk in enumerate(chunks, start=1):
-            doc_name = Path(chunk.source).stem if chunk.source else "Bilinmeyen Doküman"
+            doc_name = Path(chunk.source).stem if chunk.source else _UNKNOWN_DOC
             parts.append(
                 f"[Kaynak {i}: {doc_name} | Bölüm: {chunk.section} | Sayfa: {chunk.page_num}]\n"
                 f"{chunk.text}"
@@ -131,7 +133,7 @@ class ResponseGenerator:
         seen: set[str] = set()
         sources: list[dict] = []
         for chunk in chunks:
-            doc_name = Path(chunk.source).stem if chunk.source else "Bilinmeyen"
+            doc_name = Path(chunk.source).stem if chunk.source else _UNKNOWN_DOC
             key = f"{doc_name}:{chunk.page_num}"
             if key not in seen:
                 seen.add(key)
@@ -145,23 +147,21 @@ class ResponseGenerator:
                 )
         return sorted(sources, key=lambda s: s["score"], reverse=True)
 
-    @staticmethod
     def _build_messages(
+        self,
         query: str,
         context: str,
         history: list[ChatMessage],
     ) -> list[dict]:
-        messages: list[dict] = []
-
-        # Include recent conversation history (last 6 turns)
-        for msg in history[-6:]:
-            messages.append({"role": msg.role, "content": msg.content})
-
-        # Current query with injected context
-        user_content = (
-            f"## İlgili İK Dokümanı Bağlamı\n\n{context}\n\n"
-            f"---\n\n## Çalışan Sorusu\n\n{query}"
-        )
-        messages.append({"role": "user", "content": user_content})
-
+        messages: list[dict] = [
+            {"role": m.role, "content": m.content}
+            for m in history[-self.max_history_turns :]
+        ]
+        messages.append({
+            "role": "user",
+            "content": (
+                f"## İlgili İK Dokümanı Bağlamı\n\n{context}\n\n"
+                f"---\n\n## Çalışan Sorusu\n\n{query}"
+            ),
+        })
         return messages

@@ -1,21 +1,17 @@
 """
 Generation quality metrics:
   - Faithfulness  : Is every claim in the answer supported by the context?
-                    (LLM-as-judge approach — each sentence scored 0/1)
   - Answer Relevancy : How relevant is the answer to the original question?
-                    (LLM scores 1–5, normalized to 0–1)
-
-Both metrics use Claude as the evaluator (RAGAS-inspired).
 """
 from __future__ import annotations
 
-import json
+import logging
 from dataclasses import dataclass
 
-import anthropic
-
 from src.config import get_settings
+from src.utils.llm import llm_call, parse_llm_json
 
+logger = logging.getLogger(__name__)
 
 FAITHFULNESS_PROMPT = """\
 You are evaluating whether an AI-generated answer is faithful to its source context.
@@ -69,7 +65,7 @@ Return a JSON object:
 class GenerationMetrics:
     faithfulness: float      # 0.0–1.0
     answer_relevancy: float  # 0.0–1.0
-    faithfulness_detail: list[dict]  # per-claim breakdown
+    faithfulness_detail: list[dict]
 
     def as_dict(self) -> dict:
         return {
@@ -83,8 +79,8 @@ class GenerationEvaluator:
 
     def __init__(self):
         settings = get_settings()
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.llm_model
+        self.context_limit = settings.faithfulness_context_limit
 
     def evaluate(
         self,
@@ -93,10 +89,8 @@ class GenerationEvaluator:
         context_chunks: list[str],
     ) -> GenerationMetrics:
         context = "\n\n---\n\n".join(context_chunks)
-
         faithfulness, detail = self._evaluate_faithfulness(answer, context)
         relevancy = self._evaluate_relevancy(question, answer)
-
         return GenerationMetrics(
             faithfulness=faithfulness,
             answer_relevancy=relevancy,
@@ -109,35 +103,28 @@ class GenerationEvaluator:
         self, answer: str, context: str
     ) -> tuple[float, list[dict]]:
         try:
-            response = self.client.messages.create(
+            response = llm_call(
                 model=self.model,
                 max_tokens=1024,
                 messages=[
                     {
                         "role": "user",
                         "content": FAITHFULNESS_PROMPT.format(
-                            context=context[:4000],
+                            context=context[: self.context_limit],
                             answer=answer,
                         ),
                     }
                 ],
             )
-            text = response.content[0].text.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            data = json.loads(text)
-            score = float(data.get("faithfulness_score", 0.0))
-            claims = data.get("claims", [])
-            return score, claims
+            data = parse_llm_json(response.content[0].text)
+            return float(data.get("faithfulness_score", 0.0)), data.get("claims", [])
         except Exception as exc:
-            print(f"[GenerationEvaluator] Faithfulness eval failed: {exc}")
+            logger.warning("Faithfulness evaluation failed: %s", exc)
             return 0.0, []
 
     def _evaluate_relevancy(self, question: str, answer: str) -> float:
         try:
-            response = self.client.messages.create(
+            response = llm_call(
                 model=self.model,
                 max_tokens=256,
                 messages=[
@@ -149,16 +136,11 @@ class GenerationEvaluator:
                     }
                 ],
             )
-            text = response.content[0].text.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            data = json.loads(text)
+            data = parse_llm_json(response.content[0].text)
             score = int(data.get("score", 3))
             return (score - 1) / 4.0   # normalize 1–5 → 0.0–1.0
         except Exception as exc:
-            print(f"[GenerationEvaluator] Relevancy eval failed: {exc}")
+            logger.warning("Relevancy evaluation failed: %s", exc)
             return 0.0
 
 
@@ -169,16 +151,7 @@ class BatchGenerationEvaluator:
         self._evaluator = GenerationEvaluator()
 
     def evaluate_dataset(self, dataset: list[dict]) -> dict:
-        """
-        Args:
-            dataset: list of {
-                "question": str,
-                "answer": str,
-                "context_chunks": list[str],
-            }
-        """
         faithfulness_scores, relevancy_scores = [], []
-
         for item in dataset:
             metrics = self._evaluator.evaluate(
                 question=item["question"],

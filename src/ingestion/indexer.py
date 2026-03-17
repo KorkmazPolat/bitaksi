@@ -4,26 +4,29 @@ Multi-index vector store manager.
 Two ChromaDB collections:
   - raw_content   : semantic text chunks from document pages
   - relatives     : related/follow-up question pairs generated from each chunk
-                    (enables query-to-question matching for better recall)
 
-Embeddings: sentence-transformers (all-MiniLM-L6-v2 by default).
+Vision extraction and related-question generation are parallelised with a
+thread pool to avoid the sequential-API-call bottleneck on large documents.
 """
 from __future__ import annotations
 
 import hashlib
-import json
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 import chromadb
-import anthropic
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
 from src.config import get_settings
 from src.ingestion.document_processor import DocumentPage, DocumentProcessor
 from src.ingestion.semantic_chunker import SemanticChunker, TextChunk
 from src.ingestion.vision_extractor import VisionExtractor
+from src.utils.enums import ContentType
+from src.utils.llm import llm_call, parse_llm_json
 
+logger = logging.getLogger(__name__)
 
 RELATED_QUESTIONS_PROMPT = """\
 You are an HR knowledge assistant. Given the following HR document excerpt,
@@ -44,6 +47,8 @@ Return a JSON object:
   "follow_ups": ["follow-up 1", ...]
 }}
 """
+
+_MAX_WORKERS = 8   # thread pool size for parallel API calls
 
 
 class DocumentIndexer:
@@ -77,7 +82,6 @@ class DocumentIndexer:
             chunk_overlap=settings.chunk_overlap,
         )
         self.vision = VisionExtractor()
-        self.llm = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     # ------------------------------------------------------------------
     # Public API
@@ -85,23 +89,22 @@ class DocumentIndexer:
 
     def ingest_file(self, file_path: str) -> dict[str, Any]:
         """Full ingestion pipeline for a single file."""
-        print(f"[Indexer] Processing: {file_path}")
+        logger.info("Processing: %s", file_path)
 
         pages: list[DocumentPage] = self.processor.process(file_path)
         chunks: list[TextChunk] = self.chunker.chunk_pages(pages)
 
-        # Add visual content chunks from vision extraction
-        visual_chunks = self._extract_visual_chunks(pages)
+        visual_chunks = self._extract_visual_chunks_parallel(pages)
         all_chunks = chunks + visual_chunks
 
-        print(f"[Indexer] {len(all_chunks)} chunks ({len(chunks)} text + "
-              f"{len(visual_chunks)} visual)")
+        logger.info(
+            "%d chunks total (%d text + %d visual)",
+            len(all_chunks), len(chunks), len(visual_chunks),
+        )
 
-        # Index raw chunks
         self._upsert_chunks(self.raw_collection, all_chunks)
 
-        # Generate and index related questions
-        relatives = self._generate_relatives(all_chunks)
+        relatives = self._generate_relatives_parallel(all_chunks)
         if relatives:
             self._upsert_relatives(self.relatives_collection, relatives)
 
@@ -123,122 +126,154 @@ class DocumentIndexer:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _extract_visual_chunks(self, pages: list[DocumentPage]) -> list[TextChunk]:
+    def _extract_visual_chunks_parallel(
+        self, pages: list[DocumentPage]
+    ) -> list[TextChunk]:
+        """Extract visual content from all pages in parallel."""
         visual_chunks: list[TextChunk] = []
-        for page in pages:
+
+        def _extract_one(page: DocumentPage) -> TextChunk | None:
             extraction = self.vision.extract(page)
             if not extraction.get("has_visual_content"):
-                continue
+                return None
             visual_text = self.vision.build_visual_text(extraction)
             if not visual_text.strip():
-                continue
-            chunk_id = f"{page.doc_id}_p{page.page_num}_visual"
-            visual_chunks.append(
-                TextChunk(
-                    chunk_id=chunk_id,
-                    doc_id=page.doc_id,
-                    source=page.source,
-                    page_num=page.page_num,
-                    section_title="Visual Content",
-                    text=visual_text,
-                    chunk_index=-1,
-                    metadata={
-                        **page.metadata,
-                        "content_type": "visual",
-                        "section": "Visual Content",
-                    },
-                )
+                return None
+            return TextChunk(
+                chunk_id=f"{page.doc_id}_p{page.page_num}_visual",
+                doc_id=page.doc_id,
+                source=page.source,
+                page_num=page.page_num,
+                section_title="Visual Content",
+                text=visual_text,
+                chunk_index=-1,
+                metadata={
+                    **page.metadata,
+                    "content_type": ContentType.VISUAL,
+                    "section": "Visual Content",
+                },
             )
+
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+            futures = {pool.submit(_extract_one, page): page for page in pages}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result:
+                        visual_chunks.append(result)
+                except Exception as exc:
+                    page = futures[future]
+                    logger.warning(
+                        "Visual extraction failed for %s p%d: %s",
+                        page.doc_id, page.page_num, exc,
+                    )
+
         return visual_chunks
+
+    def _generate_relatives_parallel(
+        self, chunks: list[TextChunk]
+    ) -> list[dict]:
+        """Generate related questions for all eligible chunks in parallel."""
+        eligible = [
+            c for c in chunks
+            if len(c.text.strip()) >= self.settings.min_chunk_length_for_relatives
+        ]
+        relatives: list[dict] = []
+
+        def _gen_one(chunk: TextChunk) -> list[dict]:
+            prompt = RELATED_QUESTIONS_PROMPT.format(
+                chunk_text=chunk.text[: self.settings.chunk_preview_length],
+                section=chunk.section_title,
+                source=Path(chunk.source).name,
+                page=chunk.page_num,
+            )
+            response = llm_call(
+                model=self.settings.llm_model,
+                max_tokens=512,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            data = parse_llm_json(response.content[0].text)
+            results: list[dict] = []
+            for q in data.get("questions", []) + data.get("follow_ups", []):
+                q_id = "q_" + hashlib.md5(
+                    f"{chunk.chunk_id}:{q}".encode()
+                ).hexdigest()
+                results.append(
+                    {
+                        "id": q_id,
+                        "question": q,
+                        "chunk_id": chunk.chunk_id,
+                        "source": chunk.source,
+                        "page_num": chunk.page_num,
+                        "section": chunk.section_title,
+                    }
+                )
+            return results
+
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+            futures = {pool.submit(_gen_one, chunk): chunk for chunk in eligible}
+            for future in as_completed(futures):
+                chunk = futures[future]
+                try:
+                    relatives.extend(future.result())
+                except Exception as exc:
+                    logger.warning(
+                        "Relative generation failed for %s: %s", chunk.chunk_id, exc
+                    )
+
+        return relatives
+
+    def _batch_upsert(
+        self,
+        collection,
+        ids: list[str],
+        documents: list[str],
+        metadatas: list[dict],
+    ) -> None:
+        """Upsert in fixed-size batches to respect ChromaDB limits."""
+        size = self.settings.batch_upsert_size
+        for i in range(0, len(ids), size):
+            collection.upsert(
+                ids=ids[i: i + size],
+                documents=documents[i: i + size],
+                metadatas=metadatas[i: i + size],
+            )
 
     def _upsert_chunks(self, collection, chunks: list[TextChunk]) -> None:
         if not chunks:
             return
+        self._batch_upsert(
+            collection,
+            ids=[c.chunk_id for c in chunks],
+            documents=[c.text for c in chunks],
+            metadatas=[self._chunk_metadata(c) for c in chunks],
+        )
 
-        batch_size = 100
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i: i + batch_size]
-            collection.upsert(
-                ids=[c.chunk_id for c in batch],
-                documents=[c.text for c in batch],
-                metadatas=[
-                    {
-                        "doc_id": c.doc_id,
-                        "source": c.source,
-                        "page_num": c.page_num,
-                        "section": c.section_title,
-                        "chunk_index": c.chunk_index,
-                        **{k: str(v) for k, v in c.metadata.items()},
-                    }
-                    for c in batch
-                ],
-            )
-
-    def _generate_relatives(
-        self, chunks: list[TextChunk]
-    ) -> list[dict]:
-        """Generate (question, chunk_id, metadata) triples via LLM."""
-        relatives: list[dict] = []
-
-        for chunk in chunks:
-            if len(chunk.text.strip()) < 50:
-                continue
-            try:
-                prompt = RELATED_QUESTIONS_PROMPT.format(
-                    chunk_text=chunk.text[:1500],
-                    section=chunk.section_title,
-                    source=Path(chunk.source).name,
-                    page=chunk.page_num,
-                )
-                response = self.llm.messages.create(
-                    model=self.settings.llm_model,
-                    max_tokens=512,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                text = response.content[0].text.strip()
-                if text.startswith("```"):
-                    text = text.split("```")[1]
-                    if text.startswith("json"):
-                        text = text[4:]
-                data = json.loads(text)
-
-                for q in data.get("questions", []) + data.get("follow_ups", []):
-                    q_id = "q_" + hashlib.md5(
-                        f"{chunk.chunk_id}:{q}".encode()
-                    ).hexdigest()
-                    relatives.append(
-                        {
-                            "id": q_id,
-                            "question": q,
-                            "chunk_id": chunk.chunk_id,
-                            "source": chunk.source,
-                            "page_num": chunk.page_num,
-                            "section": chunk.section_title,
-                        }
-                    )
-            except Exception as exc:
-                print(f"[Indexer] Relative generation failed for {chunk.chunk_id}: {exc}")
-
-        return relatives
-
-    def _upsert_relatives(
-        self, collection, relatives: list[dict]
-    ) -> None:
+    def _upsert_relatives(self, collection, relatives: list[dict]) -> None:
         if not relatives:
             return
-        batch_size = 100
-        for i in range(0, len(relatives), batch_size):
-            batch = relatives[i: i + batch_size]
-            collection.upsert(
-                ids=[r["id"] for r in batch],
-                documents=[r["question"] for r in batch],
-                metadatas=[
-                    {
-                        "chunk_id": r["chunk_id"],
-                        "source": r["source"],
-                        "page_num": r["page_num"],
-                        "section": r["section"],
-                    }
-                    for r in batch
-                ],
-            )
+        self._batch_upsert(
+            collection,
+            ids=[r["id"] for r in relatives],
+            documents=[r["question"] for r in relatives],
+            metadatas=[
+                {
+                    "chunk_id": r["chunk_id"],
+                    "source": r["source"],
+                    "page_num": r["page_num"],
+                    "section": r["section"],
+                }
+                for r in relatives
+            ],
+        )
+
+    @staticmethod
+    def _chunk_metadata(c: TextChunk) -> dict:
+        return {
+            "doc_id": c.doc_id,
+            "source": c.source,
+            "page_num": c.page_num,
+            "section": c.section_title,
+            "chunk_index": c.chunk_index,
+            **{k: str(v) for k, v in c.metadata.items()},
+        }

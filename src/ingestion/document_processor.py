@@ -10,9 +10,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import logging
+
 import pdfplumber
 from docx import Document as DocxDocument
 from PIL import Image
+
+from src.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -79,7 +85,8 @@ class DocumentProcessor:
             buf = io.BytesIO()
             img.save(buf, format="PNG")
             return base64.b64encode(buf.getvalue()).decode("utf-8")
-        except Exception:
+        except Exception as exc:
+            logger.warning("PDF page render failed: %s", exc)
             return None
 
     # ------------------------------------------------------------------
@@ -90,9 +97,9 @@ class DocumentProcessor:
         doc_id = path.stem
         pages: list[DocumentPage] = []
 
-        # Group paragraphs into virtual "pages" (~50 paragraphs each)
+        # Group paragraphs into virtual "pages"
         paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-        page_size = 50
+        page_size = get_settings().docx_page_paragraph_count
         for i in range(0, max(len(paragraphs), 1), page_size):
             chunk_paragraphs = paragraphs[i: i + page_size]
             text = "\n".join(chunk_paragraphs)
