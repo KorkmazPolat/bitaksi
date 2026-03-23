@@ -192,7 +192,7 @@ class DocumentIndexer:
                 max_tokens=512,
                 messages=[{"role": "user", "content": prompt}],
             )
-            data = parse_llm_json(response.content[0].text)
+            data = parse_llm_json(response)
             results: list[dict] = []
             for q in data.get("questions", []) + data.get("follow_ups", []):
                 q_id = "q_" + hashlib.md5(

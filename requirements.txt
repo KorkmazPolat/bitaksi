@@ -5,8 +5,8 @@ python-multipart==0.0.12
 pydantic==2.10.3
 pydantic-settings==2.6.1
 
-# Anthropic SDK (Claude LLM + Vision)
-anthropic==0.40.0
+# OpenAI SDK (LLM + Vision)
+openai>=1.0.0
 
 # Vector Store
 chromadb==0.5.23
@@ -20,7 +20,7 @@ python-docx==1.1.2
 Pillow==11.0.0
 
 # Utilities
-numpy==2.2.0
+numpy<2.0
 tenacity==9.0.0
 python-dotenv==1.0.1
 httpx==0.28.1

@@ -105,7 +105,7 @@ class ResponseGenerator:
             system=SYSTEM_PROMPT,
             messages=messages,
         )
-        answer = response.content[0].text.strip()
+        answer = response.strip()
 
         return GenerationResult(
             answer=answer,

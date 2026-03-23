@@ -2,9 +2,11 @@
 Shared LLM utilities used across all modules.
 
 Provides:
-  - get_anthropic_client()  — cached singleton Anthropic client
-  - parse_llm_json()        — strip markdown fences and parse JSON
-  - llm_call()              — tenacity-wrapped message create with retry
+  - get_openai_client()  — cached singleton OpenAI client
+  - get_gemini_client()  — cached singleton Gemini client (OpenAI-compatible)
+  - get_llm_client()     — returns the active client based on llm_provider setting
+  - parse_llm_json()     — strip markdown fences and parse JSON
+  - llm_call()           — tenacity-wrapped chat completion with retry
 """
 from __future__ import annotations
 
@@ -12,7 +14,7 @@ import json
 import logging
 from functools import lru_cache
 
-import anthropic
+import openai
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -24,12 +26,29 @@ from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
 
 @lru_cache(maxsize=1)
-def get_anthropic_client() -> anthropic.Anthropic:
-    """Return the process-wide Anthropic client (created once)."""
+def get_openai_client() -> openai.OpenAI:
+    """Return the process-wide OpenAI client (created once)."""
     settings = get_settings()
-    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return openai.OpenAI(api_key=settings.openai_api_key)
+
+
+@lru_cache(maxsize=1)
+def get_gemini_client() -> openai.OpenAI:
+    """Return the process-wide Gemini client via OpenAI-compatible endpoint."""
+    settings = get_settings()
+    return openai.OpenAI(api_key=settings.gemini_api_key, base_url=GEMINI_BASE_URL)
+
+
+def get_llm_client() -> openai.OpenAI:
+    """Return the active LLM client based on the llm_provider setting."""
+    settings = get_settings()
+    if settings.llm_provider == "gemini":
+        return get_gemini_client()
+    return get_openai_client()
 
 
 def parse_llm_json(text: str) -> dict | list:
@@ -53,7 +72,7 @@ def parse_llm_json(text: str) -> dict | list:
 
 @retry(
     retry=retry_if_exception_type(
-        (anthropic.RateLimitError, anthropic.InternalServerError, anthropic.APITimeoutError)
+        (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError)
     ),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -65,13 +84,20 @@ def llm_call(
     messages: list[dict],
     max_tokens: int,
     system: str | None = None,
-) -> anthropic.types.Message:
+) -> str:
     """
-    Single wrapper around client.messages.create with automatic retry.
+    Single wrapper around client.chat.completions.create with automatic retry.
     Retries on rate-limit, server errors, and timeouts (up to 3 attempts).
+    Returns the text content of the first choice.
     """
-    client = get_anthropic_client()
-    kwargs: dict = dict(model=model, max_tokens=max_tokens, messages=messages)
+    client = get_llm_client()
+    all_messages: list[dict] = []
     if system:
-        kwargs["system"] = system
-    return client.messages.create(**kwargs)
+        all_messages.append({"role": "system", "content": system})
+    all_messages.extend(messages)
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=all_messages,
+    )
+    return response.choices[0].message.content

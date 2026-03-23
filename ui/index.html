@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HR Assistant — Test UI</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --primary: #6c63ff;
+    --primary-dim: #3d3870;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --text-dim: #8892b0;
+    --radius: 10px;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header .logo { font-size: 22px; font-weight: 700; color: var(--primary); }
+  header .sub  { font-size: 13px; color: var(--text-dim); }
+  header .badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--primary-dim);
+    color: var(--primary);
+  }
+  #status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim); display: inline-block; margin-right: 5px;
+  }
+  #status-dot.online  { background: var(--success); }
+  #status-dot.offline { background: var(--danger); }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 12px 28px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    transition: all .2s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* ── LAYOUT ── */
+  .tab-panel { display: none; padding: 24px 28px; max-width: 1400px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 16px;
+  }
+
+  /* ── FORM ELEMENTS ── */
+  label { font-size: 13px; color: var(--text-dim); display: block; margin-bottom: 6px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color .2s;
+    resize: vertical;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+  .form-row { margin-bottom: 14px; }
+
+  button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: opacity .2s, transform .1s;
+  }
+  button:active { transform: scale(.98); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { opacity: .88; }
+  .btn-danger  { background: var(--danger); color: #fff; }
+  .btn-success { background: var(--success); color: #000; }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+
+  /* ── CHAT ── */
+  #chat-layout { display: grid; grid-template-columns: 1fr 420px; gap: 20px; height: calc(100vh - 160px); }
+  @media (max-width: 1100px) { #chat-layout { grid-template-columns: 1fr; height: auto; } }
+
+  #chat-messages {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #messages-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .msg {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--primary);
+    color: #fff;
+  }
+  .msg.assistant {
+    align-self: flex-start;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .msg.system { align-self: center; color: var(--text-dim); font-size: 12px; font-style: italic; }
+
+  #chat-input-area {
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    gap: 10px;
+  }
+  #chat-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--font);
+    outline: none;
+    resize: none;
+    height: 42px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  #chat-input:focus { border-color: var(--primary); }
+
+  /* ── DETAIL PANEL ── */
+  #detail-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #detail-panel .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  #detail-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  .detail-section { }
+  .detail-label { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .detail-value { font-size: 13px; color: var(--text); line-height: 1.6; }
+
+  .badge-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-green  { background: rgba(34,197,94,.15); color: var(--success); border: 1px solid rgba(34,197,94,.3); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--warning); border: 1px solid rgba(245,158,11,.3); }
+  .badge-blue   { background: rgba(108,99,255,.15); color: var(--primary); border: 1px solid rgba(108,99,255,.3); }
+  .badge-red    { background: rgba(239,68,68,.15);  color: var(--danger);  border: 1px solid rgba(239,68,68,.3); }
+
+  .source-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .source-card .doc { font-weight: 600; color: var(--text); }
+  .source-card .meta { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+  .score-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .score-fill { height: 100%; border-radius: 4px; background: var(--primary); transition: width .5s; }
+
+  .query-chip {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 3px 3px 3px 0;
+  }
+
+  /* ── DOCUMENT UPLOAD ── */
+  #drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 48px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    color: var(--text-dim);
+  }
+  #drop-zone:hover, #drop-zone.dragover { border-color: var(--primary); background: rgba(108,99,255,.06); color: var(--text); }
+  #drop-zone .icon { font-size: 40px; display: block; margin-bottom: 12px; }
+  #drop-zone p { font-size: 15px; margin-bottom: 6px; }
+  #drop-zone small { font-size: 12px; }
+  #file-input { display: none; }
+
+  .progress-bar { height: 6px; background: var(--border); border-radius: 6px; overflow: hidden; margin: 12px 0; }
+  .progress-fill { height: 100%; background: var(--primary); border-radius: 6px; transition: width .3s; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; }
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-box .num { font-size: 26px; font-weight: 700; color: var(--primary); }
+  .stat-box .lbl { font-size: 11px; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+
+  /* ── EVALUATION ── */
+  .eval-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-top: 16px;
+  }
+  .metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-name { font-size: 14px; color: var(--text); }
+  .metric-desc { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .metric-val { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .metric-bar { width: 100px; height: 6px; background: var(--border); border-radius: 6px; margin-top: 4px; overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 6px; }
+
+  /* ── LOADING ── */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--text-dim); }
+  .empty-state .icon { font-size: 36px; margin-bottom: 12px; display: block; }
+
+  /* ── JSON VIEWER ── */
+  .json-block {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 12px;
+    color: #a8b4d0;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4a5180; }
+
+  /* ── ALERT ── */
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .alert-success { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.3); color: var(--success); }
+  .alert-error   { background: rgba(239,68,68,.12);  border: 1px solid rgba(239,68,68,.3);  color: var(--danger); }
+  .alert-info    { background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.3); color: var(--primary); }
+
+  /* markdown-lite */
+  .md b, .md strong { font-weight: 600; }
+  .md em { font-style: italic; }
+  .md code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+  .md p { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">🤖 HR Assistant</span>
+  <span class="sub">RAG-based HR Knowledge System</span>
+  <div class="badge"><span id="status-dot"></span><span id="status-text">Checking...</span></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('chat')">💬 Chat</button>
+  <button class="tab-btn" onclick="switchTab('documents')">📄 Documents</button>
+  <button class="tab-btn" onclick="switchTab('retrieval-eval')">📊 Retrieval Eval</button>
+  <button class="tab-btn" onclick="switchTab('generation-eval')">🤖 Generation Eval</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════ CHAT ═══ -->
+<div id="tab-chat" class="tab-panel active">
+  <div id="chat-layout">
+
+    <div id="chat-messages">
+      <div id="messages-body">
+        <div class="msg system">Start by asking a question about your HR policies.</div>
+      </div>
+      <div id="chat-input-area">
+        <textarea id="chat-input" placeholder="Ask a question… (Enter to send, Shift+Enter for new line)" rows="1"></textarea>
+        <button class="btn-primary" id="send-btn" onclick="sendChat()">Send</button>
+        <button class="btn-danger btn-sm" onclick="clearChat()" title="Clear chat">✕</button>
+      </div>
+    </div>
+
+    <div id="detail-panel">
+      <div class="panel-header">⚡ Response Details</div>
+      <div id="detail-body">
+        <div class="empty-state">
+          <span class="icon">🔍</span>
+          <p>Send a message to see detailed results</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ DOCUMENTS ═══ -->
+<div id="tab-documents" class="tab-panel">
+  <div class="two-col">
+
+    <div>
+      <div class="card">
+        <div class="card-title">Upload Document</div>
+        <div id="drop-zone" onclick="document.getElementById('file-input').click()"
+             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <span class="icon">📁</span>
+          <p>Drop your PDF or DOCX here</p>
+          <small>or click to browse · max 100 MB</small>
+        </div>
+        <input type="file" id="file-input" accept=".pdf,.docx,.doc" onchange="uploadFile(this.files[0])" />
+
+        <div id="upload-progress" style="display:none">
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+          <p style="font-size:13px;color:var(--text-dim);" id="upload-status">Uploading…</p>
+        </div>
+        <div id="upload-alert"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" id="ingest-result-card" style="display:none">
+        <div class="card-title">Ingestion Result</div>
+        <div id="ingest-stats" class="stat-grid"></div>
+        <div id="ingest-json" style="margin-top:16px"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title">Upload History</div>
+        <div id="upload-history" style="font-size:13px;color:var(--text-dim);">No uploads yet.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ RETRIEVAL EVAL ═══ -->
+<div id="tab-retrieval-eval" class="tab-panel">
+  <div class="two-col">
+
+    <div>
+      <div class="card">
+        <div class="card-title">Single Retrieval Evaluation</div>
+        <div class="form-row">
+          <label>Retrieved IDs <span style="color:var(--text-dim)">(comma-separated)</span></label>
+          <input type="text" id="ret-retrieved" placeholder="c1, c2, c3, c4, c5" />
+        </div>
+        <div class="form-row">
+          <label>Relevant IDs <span style="color:var(--text-dim)">(ground truth, comma-separated)</span></label>
+          <input type="text" id="ret-relevant" placeholder="c1, c2" />
+        </div>
+        <div class="form-row">
+          <label>K (top-K to evaluate)</label>
+          <input type="number" id="ret-k" value="5" min="1" max="20" style="width:100px" />
+        </div>
+        <button class="btn-primary" onclick="runRetrievalEval()">Run Evaluation</button>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title">Batch Retrieval Evaluation</div>
+        <div class="form-row">
+          <label>Dataset JSON <span style="color:var(--text-dim)">(array of {retrieved_ids, relevant_ids})</span></label>
+          <textarea id="ret-batch-json" rows="8" placeholder='[
+  {"retrieved_ids": ["c1","c2","c3"], "relevant_ids": ["c1","c2"]},
+  {"retrieved_ids": ["c4","c5"], "relevant_ids": ["c4"]}
+]'></textarea>
+        </div>
+        <div class="form-row">
+          <label>K</label>
+          <input type="number" id="ret-batch-k" value="5" min="1" max="20" style="width:100px" />
+        </div>
+        <button class="btn-primary" onclick="runRetrievalBatch()">Run Batch</button>
+      </div>
+    </div>
+
+    <div>
+      <div id="ret-result-area">
+        <div class="empty-state">
+          <span class="icon">📊</span>
+          <p>Results will appear here</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ GENERATION EVAL ═══ -->
+<div id="tab-generation-eval" class="tab-panel">
+  <div class="two-col">
+
+    <div>
+      <div class="card">
+        <div class="card-title">Single Generation Evaluation</div>
+        <div class="form-row">
+          <label>Question</label>
+          <input type="text" id="gen-question" placeholder="What is the annual leave policy?" />
+        </div>
+        <div class="form-row">
+          <label>Answer <span style="color:var(--text-dim)">(from the model)</span></label>
+          <textarea id="gen-answer" rows="4" placeholder="The annual leave policy states…"></textarea>
+        </div>
+        <div class="form-row">
+          <label>Context Chunks <span style="color:var(--text-dim)">(one per line)</span></label>
+          <textarea id="gen-context" rows="6" placeholder="Paste retrieved context chunks, one per line…"></textarea>
+        </div>
+        <button class="btn-primary" onclick="runGenerationEval()">Evaluate</button>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title">Batch Generation Evaluation</div>
+        <div class="form-row">
+          <label>Dataset JSON <span style="color:var(--text-dim)">(array of {question, answer, context_chunks})</span></label>
+          <textarea id="gen-batch-json" rows="8" placeholder='[
+  {
+    "question": "How many vacation days?",
+    "answer": "You get 14 days.",
+    "context_chunks": ["Employees are entitled to 14 days..."]
+  }
+]'></textarea>
+        </div>
+        <button class="btn-primary" onclick="runGenerationBatch()">Run Batch</button>
+      </div>
+    </div>
+
+    <div>
+      <div id="gen-result-area">
+        <div class="empty-state">
+          <span class="icon">🤖</span>
+          <p>Results will appear here</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let chatHistory = [];
+let uploadHistory = [];
+
+// ── Health check ──────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const ok = r.ok;
+    document.getElementById('status-dot').className = ok ? 'online' : 'offline';
+    document.getElementById('status-text').textContent = ok ? 'Online' : 'Offline';
+  } catch {
+    document.getElementById('status-dot').className = 'offline';
+    document.getElementById('status-text').textContent = 'Offline';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 15000);
+
+// ── Tab switching ─────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Utilities ─────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function mdLite(s) {
+  return escHtml(s)
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g,'<em>$1</em>')
+    .replace(/`(.*?)`/g,'<code>$1</code>')
+    .replace(/\n/g,'<br>');
+}
+function scoreColor(v) {
+  if (v >= 0.75) return 'var(--success)';
+  if (v >= 0.45) return 'var(--warning)';
+  return 'var(--danger)';
+}
+
+// ── CHAT ──────────────────────────────────────
+const inputEl = document.getElementById('chat-input');
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  // auto-resize
+  setTimeout(() => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+  }, 0);
+});
+
+function appendMsg(role, text) {
+  const body = document.getElementById('messages-body');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (role === 'assistant') {
+    div.innerHTML = `<div class="md">${mdLite(text)}</div>`;
+  } else {
+    div.textContent = text;
+  }
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+function appendThinking() {
+  const body = document.getElementById('messages-body');
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+  div.id = 'thinking-msg';
+  div.innerHTML = '<span class="spinner"></span> Thinking…';
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('thinking-msg');
+  if (el) el.remove();
+}
+
+async function sendChat() {
+  const query = inputEl.value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+
+  appendMsg('user', query);
+  appendThinking();
+
+  const historyPayload = chatHistory.slice(-12).map(m => ({role: m.role, content: m.content}));
+
+  try {
+    const res = await fetch(`${API}/chat/`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query, history: historyPayload })
+    });
+    const data = await res.json();
+    removeThinking();
+
+    if (!res.ok) {
+      appendMsg('assistant', `Error: ${data.detail || 'Unknown error'}`);
+    } else {
+      appendMsg('assistant', data.answer);
+      chatHistory.push({ role: 'user', content: query });
+      chatHistory.push({ role: 'assistant', content: data.answer });
+      renderDetail(data);
+    }
+  } catch (err) {
+    removeThinking();
+    appendMsg('assistant', `Network error: ${err.message}`);
+  }
+
+  btn.disabled = false;
+  inputEl.focus();
+}
+
+function clearChat() {
+  chatHistory = [];
+  document.getElementById('messages-body').innerHTML = '<div class="msg system">Chat cleared. Start a new conversation.</div>';
+  document.getElementById('detail-body').innerHTML = '<div class="empty-state"><span class="icon">🔍</span><p>Send a message to see detailed results</p></div>';
+}
+
+function renderDetail(data) {
+  const body = document.getElementById('detail-body');
+
+  const groundedBadge = data.grounded
+    ? '<span class="badge-pill badge-green">✔ Grounded</span>'
+    : '<span class="badge-pill badge-red">✘ Not Grounded</span>';
+
+  const strategyColor = {direct:'badge-green', query_expansion:'badge-yellow', hyde:'badge-yellow', query_decomposition:'badge-yellow'}[data.strategy_used] || 'badge-blue';
+
+  const queriesHtml = (data.queries_tried || []).map(q =>
+    `<span class="query-chip">${escHtml(q)}</span>`
+  ).join('');
+
+  const sourcesHtml = (data.sources || []).map(s => {
+    const pct = Math.round(s.score * 100);
+    return `<div class="source-card">
+      <div class="doc">📄 ${escHtml(s.document)}</div>
+      <div class="meta">Page ${s.page} · ${escHtml(s.section)}</div>
+      <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">Score: ${s.score.toFixed(3)}</div>
+    </div>`;
+  }).join('') || '<p style="color:var(--text-dim);font-size:13px;">No sources</p>';
+
+  body.innerHTML = `
+    <div class="detail-section">
+      <div class="detail-label">Status</div>
+      <div>${groundedBadge} <span class="badge-pill ${strategyColor}" style="margin-left:6px;">${escHtml(data.strategy_used)}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-label">Queries Tried (${(data.queries_tried||[]).length})</div>
+      <div>${queriesHtml}</div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-label">Sources (${(data.sources||[]).length})</div>
+      ${sourcesHtml}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-label">Raw JSON</div>
+      <div class="json-block">${escHtml(JSON.stringify(data, null, 2))}</div>
+    </div>
+  `;
+}
+
+// ── DOCUMENTS ─────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('dragover'); }
+function onDragLeave()  { document.getElementById('drop-zone').classList.remove('dragover'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  const allowed = ['.pdf', '.docx', '.doc'];
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!allowed.includes(ext)) {
+    showAlert('upload-alert', `Unsupported file type: ${ext}`, 'error');
+    return;
+  }
+
+  const progressEl  = document.getElementById('upload-progress');
+  const progressFill = document.getElementById('progress-fill');
+  const statusEl    = document.getElementById('upload-status');
+  const alertEl     = document.getElementById('upload-alert');
+  alertEl.innerHTML = '';
+  progressEl.style.display = 'block';
+  progressFill.style.width = '15%';
+  statusEl.textContent = `Uploading ${file.name}…`;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // fake progress animation
+  let prog = 15;
+  const tick = setInterval(() => {
+    prog = Math.min(prog + 5, 85);
+    progressFill.style.width = prog + '%';
+  }, 400);
+
+  try {
+    statusEl.textContent = 'Processing… (this may take a minute for large documents)';
+    const res = await fetch(`${API}/documents/ingest`, { method: 'POST', body: formData });
+    clearInterval(tick);
+    progressFill.style.width = '100%';
+    const data = await res.json();
+
+    if (!res.ok) {
+      showAlert('upload-alert', data.detail || 'Upload failed', 'error');
+    } else {
+      showAlert('upload-alert', `✔ ${file.name} ingested successfully!`, 'success');
+      renderIngestResult(data, file.name);
+      uploadHistory.unshift({ name: file.name, time: new Date().toLocaleTimeString(), stats: data });
+      renderUploadHistory();
+    }
+  } catch (err) {
+    clearInterval(tick);
+    showAlert('upload-alert', `Network error: ${err.message}`, 'error');
+  } finally {
+    setTimeout(() => { progressEl.style.display = 'none'; progressFill.style.width = '0%'; }, 1500);
+  }
+}
+
+function renderIngestResult(data, filename) {
+  const card = document.getElementById('ingest-result-card');
+  card.style.display = 'block';
+  document.getElementById('ingest-stats').innerHTML = `
+    <div class="stat-box"><div class="num">${data.pages}</div><div class="lbl">Pages</div></div>
+    <div class="stat-box"><div class="num">${data.text_chunks}</div><div class="lbl">Text Chunks</div></div>
+    <div class="stat-box"><div class="num">${data.visual_chunks}</div><div class="lbl">Visual Chunks</div></div>
+    <div class="stat-box"><div class="num">${data.relatives}</div><div class="lbl">Q&A Pairs</div></div>
+  `;
+  document.getElementById('ingest-json').innerHTML = `<div class="json-block">${escHtml(JSON.stringify(data, null, 2))}</div>`;
+}
+
+function renderUploadHistory() {
+  const el = document.getElementById('upload-history');
+  if (!uploadHistory.length) { el.textContent = 'No uploads yet.'; return; }
+  el.innerHTML = uploadHistory.map(u => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:13px;color:var(--text);">📄 ${escHtml(u.name)}</div>
+        <div style="font-size:11px;color:var(--text-dim);">${u.time} · ${u.stats.pages}p · ${u.stats.text_chunks} chunks · ${u.stats.relatives} Q&As</div>
+      </div>
+      <span class="badge-pill badge-green" style="font-size:11px;">done</span>
+    </div>
+  `).join('');
+}
+
+// ── RETRIEVAL EVAL ────────────────────────────
+async function runRetrievalEval() {
+  const retrieved = document.getElementById('ret-retrieved').value.split(',').map(s => s.trim()).filter(Boolean);
+  const relevant  = document.getElementById('ret-relevant').value.split(',').map(s => s.trim()).filter(Boolean);
+  const k = parseInt(document.getElementById('ret-k').value) || 5;
+
+  if (!retrieved.length || !relevant.length) {
+    showEvalResult('ret-result-area', null, 'Please fill in both fields.');
+    return;
+  }
+
+  showEvalLoading('ret-result-area');
+  try {
+    const res = await fetch(`${API}/evaluation/retrieval`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ retrieved_ids: retrieved, relevant_ids: relevant, k })
+    });
+    const data = await res.json();
+    if (!res.ok) { showEvalResult('ret-result-area', null, data.detail); return; }
+    renderRetrievalResult('ret-result-area', data, false);
+  } catch (err) {
+    showEvalResult('ret-result-area', null, err.message);
+  }
+}
+
+async function runRetrievalBatch() {
+  let dataset;
+  try { dataset = JSON.parse(document.getElementById('ret-batch-json').value); }
+  catch { showEvalResult('ret-result-area', null, 'Invalid JSON'); return; }
+  const k = parseInt(document.getElementById('ret-batch-k').value) || 5;
+
+  showEvalLoading('ret-result-area');
+  try {
+    const res = await fetch(`${API}/evaluation/retrieval/batch`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dataset, k })
+    });
+    const data = await res.json();
+    if (!res.ok) { showEvalResult('ret-result-area', null, data.detail); return; }
+    renderRetrievalResult('ret-result-area', data, true);
+  } catch (err) {
+    showEvalResult('ret-result-area', null, err.message);
+  }
+}
+
+function renderRetrievalResult(containerId, data, isBatch) {
+  const metrics = [
+    { key: 'recall_at_k',   label: 'Recall@K',  desc: 'Fraction of relevant items found in top-K results' },
+    { key: 'mrr',           label: 'MRR',        desc: 'Mean Reciprocal Rank — how high the first relevant result ranks' },
+    { key: 'ndcg_at_k',     label: 'NDCG@K',     desc: 'Normalized Discounted Cumulative Gain — ranking quality' },
+  ];
+  const rows = metrics.map(m => {
+    const v = data[m.key] ?? data[`mean_${m.key}`] ?? null;
+    const pct = v !== null ? Math.round(v * 100) : null;
+    const color = v !== null ? scoreColor(v) : 'var(--text-dim)';
+    return `<div class="metric-row">
+      <div>
+        <div class="metric-name">${m.label}${isBatch ? ' (mean)' : ''}</div>
+        <div class="metric-desc">${m.desc}</div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:${pct??0}%;background:${color}"></div></div>
+      </div>
+      <div class="metric-val" style="color:${color}">${v !== null ? v.toFixed(3) : '—'}</div>
+    </div>`;
+  }).join('');
+
+  const el = document.getElementById(containerId);
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">${isBatch ? 'Batch ' : ''}Retrieval Metrics</div>
+      <div class="eval-result">${rows}</div>
+      <div style="margin-top:14px">
+        <div class="card-title">Raw Response</div>
+        <div class="json-block">${escHtml(JSON.stringify(data, null, 2))}</div>
+      </div>
+    </div>`;
+}
+
+// ── GENERATION EVAL ───────────────────────────
+async function runGenerationEval() {
+  const question = document.getElementById('gen-question').value.trim();
+  const answer   = document.getElementById('gen-answer').value.trim();
+  const context_chunks = document.getElementById('gen-context').value.split('\n').map(s => s.trim()).filter(Boolean);
+
+  if (!question || !answer || !context_chunks.length) {
+    showEvalResult('gen-result-area', null, 'Please fill in all fields.');
+    return;
+  }
+
+  showEvalLoading('gen-result-area');
+  try {
+    const res = await fetch(`${API}/evaluation/generation`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ question, answer, context_chunks })
+    });
+    const data = await res.json();
+    if (!res.ok) { showEvalResult('gen-result-area', null, data.detail); return; }
+    renderGenerationResult('gen-result-area', data, false);
+  } catch (err) {
+    showEvalResult('gen-result-area', null, err.message);
+  }
+}
+
+async function runGenerationBatch() {
+  let dataset;
+  try { dataset = JSON.parse(document.getElementById('gen-batch-json').value); }
+  catch { showEvalResult('gen-result-area', null, 'Invalid JSON'); return; }
+
+  showEvalLoading('gen-result-area');
+  try {
+    const res = await fetch(`${API}/evaluation/generation/batch`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dataset })
+    });
+    const data = await res.json();
+    if (!res.ok) { showEvalResult('gen-result-area', null, data.detail); return; }
+    renderGenerationResult('gen-result-area', data, true);
+  } catch (err) {
+    showEvalResult('gen-result-area', null, err.message);
+  }
+}
+
+function renderGenerationResult(containerId, data, isBatch) {
+  const metrics = [
+    { key: 'faithfulness',     label: 'Faithfulness',     desc: 'How well the answer is supported by the retrieved context' },
+    { key: 'answer_relevancy', label: 'Answer Relevancy', desc: 'How relevant the answer is to the question (normalized 0–1)' },
+  ];
+  const rows = metrics.map(m => {
+    const v = data[m.key] ?? data[`mean_${m.key}`] ?? null;
+    const pct = v !== null ? Math.round(v * 100) : null;
+    const color = v !== null ? scoreColor(v) : 'var(--text-dim)';
+    return `<div class="metric-row">
+      <div>
+        <div class="metric-name">${m.label}${isBatch ? ' (mean)' : ''}</div>
+        <div class="metric-desc">${m.desc}</div>
+        <div class="metric-bar"><div class="metric-bar-fill" style="width:${pct??0}%;background:${color}"></div></div>
+      </div>
+      <div class="metric-val" style="color:${color}">${v !== null ? v.toFixed(3) : '—'}</div>
+    </div>`;
+  }).join('');
+
+  const el = document.getElementById(containerId);
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">${isBatch ? 'Batch ' : ''}Generation Metrics</div>
+      <div class="eval-result">${rows}</div>
+      <div style="margin-top:14px">
+        <div class="card-title">Raw Response</div>
+        <div class="json-block">${escHtml(JSON.stringify(data, null, 2))}</div>
+      </div>
+    </div>`;
+}
+
+// ── Helpers ───────────────────────────────────
+function showAlert(containerId, msg, type) {
+  const map = { success: 'alert-success', error: 'alert-error', info: 'alert-info' };
+  document.getElementById(containerId).innerHTML = `<div class="alert ${map[type]||'alert-info'}">${escHtml(msg)}</div>`;
+}
+
+function showEvalLoading(containerId) {
+  document.getElementById(containerId).innerHTML = `
+    <div class="empty-state"><span class="spinner"></span> Evaluating…</div>`;
+}
+
+function showEvalResult(containerId, data, errorMsg) {
+  if (errorMsg) {
+    document.getElementById(containerId).innerHTML = `<div class="alert alert-error">${escHtml(errorMsg)}</div>`;
+  }
+}
+</script>
+</body>
+</html>

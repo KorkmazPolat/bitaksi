@@ -41,7 +41,7 @@ class HyDERetrieval:
                     {"role": "user", "content": HYDE_PROMPT.format(query=query)}
                 ],
             )
-            return response.content[0].text.strip()
+            return response.strip()
         except Exception as exc:
             logger.warning("HyDE hypothesis generation failed: %s", exc)
             return query

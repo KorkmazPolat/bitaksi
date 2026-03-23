@@ -3,10 +3,14 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    gemini_api_key: str = ""
 
-    llm_model: str = "claude-sonnet-4-6"
-    vision_model: str = "claude-sonnet-4-6"
+    # Provider: "openai" or "gemini"
+    llm_provider: str = "openai"
+
+    llm_model: str = "gpt-4o"
+    vision_model: str = "gpt-4o"
     embedding_model: str = "all-MiniLM-L6-v2"
 
     chroma_persist_dir: str = "./data/chroma"

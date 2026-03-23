@@ -41,7 +41,7 @@ class QueryDecomposer:
                     {"role": "user", "content": DECOMP_PROMPT.format(query=query)}
                 ],
             )
-            sub_questions = parse_llm_json(response.content[0].text)
+            sub_questions = parse_llm_json(response)
             return sub_questions if sub_questions else [query]
         except Exception as exc:
             logger.warning("Query decomposition failed: %s", exc)

@@ -45,7 +45,7 @@ class QueryExpander:
                     }
                 ],
             )
-            variants = parse_llm_json(response.content[0].text)
+            variants = parse_llm_json(response)
             seen = {query}
             result = [query]
             for v in variants:

@@ -116,7 +116,7 @@ class GenerationEvaluator:
                     }
                 ],
             )
-            data = parse_llm_json(response.content[0].text)
+            data = parse_llm_json(response)
             return float(data.get("faithfulness_score", 0.0)), data.get("claims", [])
         except Exception as exc:
             logger.warning("Faithfulness evaluation failed: %s", exc)
@@ -136,7 +136,7 @@ class GenerationEvaluator:
                     }
                 ],
             )
-            data = parse_llm_json(response.content[0].text)
+            data = parse_llm_json(response)
             score = int(data.get("score", 3))
             return (score - 1) / 4.0   # normalize 1–5 → 0.0–1.0
         except Exception as exc:

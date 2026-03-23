@@ -1,5 +1,5 @@
 """
-Vision extractor: uses a vision LLM (Claude) to extract structured content
+Vision extractor: uses a vision LLM (GPT-4o) to extract structured content
 from page images — tables, figures, charts — that plain text parsing misses.
 """
 from __future__ import annotations
@@ -8,7 +8,7 @@ import logging
 
 from src.config import get_settings
 from src.ingestion.document_processor import DocumentPage
-from src.utils.llm import get_anthropic_client, parse_llm_json
+from src.utils.llm import get_llm_client, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ and return empty arrays.
 
 
 class VisionExtractor:
-    """Extracts structured content from page images using Claude vision."""
+    """Extracts structured content from page images using GPT-4o vision."""
 
     def __init__(self):
         settings = get_settings()
@@ -52,8 +52,8 @@ class VisionExtractor:
             return self._empty_result()
 
         try:
-            client = get_anthropic_client()
-            response = client.messages.create(
+            client = get_llm_client()
+            response = client.chat.completions.create(
                 model=self.model,
                 max_tokens=2048,
                 messages=[
@@ -61,11 +61,9 @@ class VisionExtractor:
                         "role": "user",
                         "content": [
                             {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/png",
-                                    "data": page.image_b64,
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{page.image_b64}",
                                 },
                             },
                             {"type": "text", "text": VISION_PROMPT},
@@ -73,7 +71,7 @@ class VisionExtractor:
                     }
                 ],
             )
-            return parse_llm_json(response.content[0].text)
+            return parse_llm_json(response.choices[0].message.content)
         except Exception as exc:
             logger.warning(
                 "Vision extraction failed for %s page %d: %s",
