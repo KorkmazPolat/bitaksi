@@ -3,148 +3,413 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chunk Detaylari</title>
+  <title>Teknik Analiz Dashboard</title>
   <style>
     :root {
-      --bg: #f4f6f8;
+      --bg: #edf2f7;
       --panel: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --line: #d1d5db;
-      --primary: #2563eb;
-      --radius: 12px;
+      --panel-2: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #d8e1ea;
+      --accent: #0f766e;
+      --accent-soft: #ccfbf1;
+      --warn: #b45309;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--text);
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(15,118,110,0.08), transparent 28%),
+        linear-gradient(180deg, #f8fbfc 0%, var(--bg) 100%);
+      color: var(--text);
     }
 
     header {
-      padding: 12px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--line);
-      background: var(--panel);
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(10px);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .title { font-weight: 700; }
+    .title-wrap { display: flex; flex-direction: column; gap: 3px; }
+    .title { font-weight: 800; font-size: 18px; }
+    .subtitle { color: var(--muted); font-size: 12px; }
     .spacer { flex: 1; }
 
-    .btn, select, .link-btn {
+    .btn, .link-btn, select, input {
       border: 1px solid var(--line);
       background: #fff;
       color: var(--text);
-      border-radius: 10px;
-      padding: 8px 12px;
+      border-radius: 12px;
+      padding: 10px 12px;
       font-family: inherit;
       font-size: 13px;
       text-decoration: none;
     }
 
     .btn { cursor: pointer; }
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
 
     #status {
-      color: var(--muted);
       font-size: 12px;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
     }
 
     main {
-      padding: 14px;
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      gap: 16px;
     }
 
-    .summary {
+    .hero, .panel, .stat {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      padding: 12px;
-      margin-bottom: 12px;
-      font-size: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
       line-height: 1.6;
+      font-size: 14px;
     }
 
-    .chunk {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .chunk-head {
+    .hero-meta {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      align-content: flex-start;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .pill.accent {
+      background: var(--accent-soft);
+      border-color: #99f6e4;
+      color: #115e59;
+      font-weight: 700;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      padding: 14px;
+    }
+
+    .stat .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat .value {
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .panel {
+      padding: 16px;
+      min-height: 0;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .panel-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .scroll {
+      max-height: 62vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .cards {
+      display: grid;
+      gap: 12px;
+    }
+
+    .chunk-card, .question-card, .trace-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-2);
+      padding: 14px;
+    }
+
+    .chunk-card.active, .trace-card.active {
+      border-color: #5eead4;
+      background: #f0fdfa;
+    }
+
+    .head-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
       margin-bottom: 10px;
     }
 
     .badge {
-      background: #f9fafb;
+      background: #fff;
       border: 1px solid var(--line);
       border-radius: 999px;
       padding: 4px 8px;
-      font-size: 12px;
+      font-size: 11px;
     }
 
-    .label {
-      margin: 10px 0 6px;
+    .badge.warn {
+      color: var(--warn);
+      border-color: #fcd34d;
+      background: #fffbeb;
+    }
+
+    .mono, pre {
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
       font-size: 12px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 600;
     }
 
     .block {
       border: 1px dashed var(--line);
-      border-radius: 10px;
+      border-radius: 12px;
+      background: #fff;
       padding: 10px;
       white-space: pre-wrap;
-      line-height: 1.5;
-      font-family: "Consolas", "Menlo", monospace;
-      font-size: 12px;
-      background: #fcfcfd;
-      overflow-x: auto;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
     }
 
-    details { margin-top: 8px; }
-    summary { cursor: pointer; color: var(--primary); font-size: 13px; }
+    .muted { color: var(--muted); }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .list-item {
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .empty {
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px dashed var(--line);
+      color: var(--muted);
+      background: rgba(255,255,255,0.65);
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .toolbar input {
+      min-width: 240px;
+      flex: 1;
+    }
+
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color: var(--accent); font-size: 13px; font-weight: 700; }
+
+    @media (max-width: 1100px) {
+      .hero, .grid, .split { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .scroll { max-height: none; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <div class="title">Chunk Detaylari</div>
+    <div class="title-wrap">
+      <div class="title">Teknik Analiz Dashboard</div>
+      <div class="subtitle">Chunk yapisi, generated relatives ve chat retrieval trace inceleme paneli</div>
+    </div>
     <span id="status">Hazir</span>
     <div class="spacer"></div>
     <a class="link-btn" href="/">Sohbet</a>
-    <button class="btn" onclick="loadDocs()">Yenile</button>
+    <button class="btn" onclick="refreshAll()">Yenile</button>
     <button class="btn" onclick="deleteSelectedDoc()">Dokumani Sil</button>
-    <select id="docSelect" onchange="loadChunks()">
+    <select id="docSelect" onchange="refreshAll()">
       <option value="">Dokuman secin</option>
     </select>
   </header>
 
   <main>
-    <section class="summary" id="summaryBox">
-      Bu sayfada secilen dokumanin tum chunk'lari ve metadata bilgileri listelenir.
+    <section class="hero">
+      <div>
+        <h1 id="heroTitle">Sistem icini gormek icin bir dokuman secin</h1>
+        <p id="heroText">Bu panel raw chunk'lari, her chunk icin uretilen relative sorulari ve chat sirasinda hangi retrieval/grounding kararlarinin verildigini tek yerde toplar.</p>
+      </div>
+      <div class="hero-meta" id="heroMeta">
+        <span class="pill accent">debug mode</span>
+        <span class="pill">raw chunks</span>
+        <span class="pill">relative questions</span>
+        <span class="pill">chat traces</span>
+      </div>
     </section>
 
-    <div id="chunks"></div>
+    <section class="stats">
+      <article class="stat"><div class="label">Secili Dokuman</div><div class="value" id="statDoc">-</div></article>
+      <article class="stat"><div class="label">Raw Chunk</div><div class="value" id="statChunks">0</div></article>
+      <article class="stat"><div class="label">Relative Q&A</div><div class="value" id="statRelatives">0</div></article>
+      <article class="stat"><div class="label">Chat Trace</div><div class="value" id="statChats">0</div></article>
+      <article class="stat"><div class="label">Grounded Rate</div><div class="value" id="statGrounded">-</div></article>
+    </section>
+
+    <section class="grid">
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Raw Chunk Explorer</div>
+              <div class="panel-sub">Dokumandaki tum chunk kayitlari ve metadata</div>
+            </div>
+            <div class="toolbar">
+              <input id="chunkFilter" type="text" placeholder="Chunk text / section / page ara" oninput="renderChunks()" />
+            </div>
+          </div>
+          <div class="scroll">
+            <div id="chunks"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Generated Relative Questions</div>
+              <div class="panel-sub">Chunk retrieval recall'unu artirmak icin uretilen soru varyantlari</div>
+            </div>
+          </div>
+          <div class="scroll">
+            <div id="relatives"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Chat Retrieval Trace</div>
+              <div class="panel-sub">Sorular, strategy, tried queries, kaynaklar ve match breakdown</div>
+            </div>
+            <div class="toolbar">
+              <input id="traceFilter" type="text" placeholder="Soru veya strategy ara" oninput="renderTraces()" />
+            </div>
+          </div>
+          <div class="split">
+            <div class="scroll">
+              <div id="traces"></div>
+            </div>
+            <div class="scroll">
+              <div id="traceDetail" class="empty">Bir trace secildiginde retrieval ve citation detaylari burada gosterilir.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   </main>
 
   <script>
     const API = "";
+    let dashboardState = {
+      docs: [],
+      selectedDoc: "",
+      chunks: [],
+      relatives: [],
+      traces: [],
+      activeTraceIndex: -1,
+    };
 
-    function setStatus(t) {
-      document.getElementById("status").textContent = t;
+    function setStatus(text) {
+      document.getElementById("status").textContent = text;
     }
 
     function escapeHtml(s) {
@@ -154,136 +419,337 @@
         .replace(/>/g, "&gt;");
     }
 
+    function formatTime(ts) {
+      if (!ts) return "-";
+      return new Date(ts * 1000).toLocaleString("tr-TR");
+    }
+
+    function preview(text, limit = 240) {
+      const value = (text || "").trim();
+      if (value.length <= limit) return value;
+      return `${value.slice(0, limit)}...`;
+    }
+
     async function loadDocs() {
-      setStatus("Dokuman listesi yukleniyor...");
       const select = document.getElementById("docSelect");
+      const current = dashboardState.selectedDoc || select.value;
+      const res = await fetch(`${API}/documents/`);
+      const docs = await res.json();
+      docs.sort((a, b) => a.doc_id.localeCompare(b.doc_id));
+      dashboardState.docs = docs;
 
+      select.innerHTML = '<option value="">Dokuman secin</option>';
+      docs.forEach((doc) => {
+        const opt = document.createElement("option");
+        opt.value = doc.doc_id;
+        opt.textContent = `${doc.doc_id} (max_page=${doc.max_page})`;
+        if (doc.doc_id === current) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      dashboardState.selectedDoc = select.value;
+    }
+
+    async function refreshAll() {
       try {
-        const res = await fetch(`${API}/documents/`);
-        const docs = await res.json();
-
-        docs.sort((a, b) => a.doc_id.localeCompare(b.doc_id));
-        select.innerHTML = '<option value="">Dokuman secin</option>';
-
-        for (const d of docs) {
-          const opt = document.createElement("option");
-          opt.value = d.doc_id;
-          opt.textContent = `${d.doc_id} (max_page=${d.max_page})`;
-          select.appendChild(opt);
-        }
-
-        setStatus(`${docs.length} dokuman bulundu.`);
+        setStatus("Dashboard verileri yukleniyor...");
+        await loadDocs();
+        dashboardState.selectedDoc = document.getElementById("docSelect").value;
+        await Promise.all([loadChunksAndRelatives(), loadChatDebug()]);
+        renderDashboard();
+        setStatus("Dashboard guncel.");
       } catch {
-        setStatus("Dokumanlar yuklenemedi.");
+        setStatus("Dashboard verileri yuklenemedi.");
       }
     }
 
-    async function loadChunks() {
-      const docId = document.getElementById("docSelect").value;
-      const chunksEl = document.getElementById("chunks");
-      const summaryEl = document.getElementById("summaryBox");
-
+    async function loadChunksAndRelatives() {
+      const docId = dashboardState.selectedDoc;
       if (!docId) {
-        chunksEl.innerHTML = "";
-        summaryEl.textContent = "Dokuman seciniz.";
+        dashboardState.chunks = [];
+        dashboardState.relatives = [];
         return;
       }
 
-      setStatus(`${docId} chunk verileri yukleniyor...`);
-      chunksEl.innerHTML = "";
+      const [chunkRes, relRes] = await Promise.all([
+        fetch(`${API}/documents/${encodeURIComponent(docId)}/chunks`),
+        fetch(`${API}/documents/${encodeURIComponent(docId)}/relatives`),
+      ]);
 
-      try {
-        const res = await fetch(`${API}/documents/${encodeURIComponent(docId)}/chunks`);
-        const data = await res.json();
+      const chunkData = await chunkRes.json();
+      const relData = await relRes.json();
+      dashboardState.chunks = chunkData.chunks || [];
+      dashboardState.relatives = relData.questions || [];
+    }
 
-        summaryEl.innerHTML = `
-          <strong>doc_id:</strong> ${escapeHtml(data.doc_id)}<br>
-          <strong>total_chunks:</strong> ${data.total_chunks}<br>
-          Asagida tum chunk kayitlari listelenmistir.
-        `;
-
-        if (!data.chunks || data.chunks.length === 0) {
-          chunksEl.innerHTML = '<section class="summary">Chunk bulunamadi.</section>';
-          setStatus("Chunk bulunamadi.");
-          return;
-        }
-
-        const frag = document.createDocumentFragment();
-
-        data.chunks.forEach((c, i) => {
-          const card = document.createElement("article");
-          card.className = "chunk";
-          card.innerHTML = `
-            <div class="chunk-head">
-              <span class="badge">#${i + 1}</span>
-              <span class="badge">id: ${escapeHtml(c.id)}</span>
-              <span class="badge">page: ${c.page_num}</span>
-              <span class="badge">chunk_index: ${c.chunk_index}</span>
-              <span class="badge">tokens: ${c.token_count}</span>
-              <span class="badge">type: ${escapeHtml(c.content_type)}</span>
-            </div>
-
-            <div class="label">Kaynak</div>
-            <div class="block">source: ${escapeHtml(c.source)}\nsection: ${escapeHtml(c.section)}\nbreadcrumb: ${escapeHtml(c.breadcrumb)}</div>
-
-            <div class="label">Chunk Text</div>
-            <div class="block">${escapeHtml(c.text)}</div>
-
-            <details>
-              <summary>Parent Text</summary>
-              <div class="block">${escapeHtml(c.parent_text || "")}</div>
-            </details>
-
-            <details>
-              <summary>Raw Metadata JSON</summary>
-              <div class="block">${escapeHtml(JSON.stringify(c.metadata, null, 2))}</div>
-            </details>
-          `;
-          frag.appendChild(card);
-        });
-
-        chunksEl.appendChild(frag);
-        setStatus(`${data.total_chunks} chunk gosteriliyor.`);
-      } catch {
-        chunksEl.innerHTML = '<section class="summary">Chunk detaylari alinamadi.</section>';
-        setStatus("Chunk detaylari alinamadi.");
+    async function loadChatDebug() {
+      const res = await fetch(`${API}/chat/debug/recent`);
+      const items = await res.json();
+      dashboardState.traces = items || [];
+      if (dashboardState.activeTraceIndex >= dashboardState.traces.length) {
+        dashboardState.activeTraceIndex = -1;
       }
     }
 
+    function renderDashboard() {
+      renderHero();
+      renderStats();
+      renderChunks();
+      renderRelatives();
+      renderTraces();
+      renderTraceDetail();
+    }
+
+    function renderHero() {
+      const docId = dashboardState.selectedDoc;
+      document.getElementById("heroTitle").textContent = docId
+        ? `${docId} icin teknik analiz gorunumu`
+        : "Sistem icini gormek icin bir dokuman secin";
+      document.getElementById("heroText").textContent = docId
+        ? "Bu gorunum chunk kalitesi, generated relative sorular ve canli chat trace'leri ayni ekranda incelemek icin tasarlandi."
+        : "Secim yapildiginda dashboard dokuman bazli chunk/relative veri ile son chat retrieval trace'lerini birlestirir.";
+    }
+
+    function renderStats() {
+      const docId = dashboardState.selectedDoc || "-";
+      const traces = filterTracesBySelectedDoc(dashboardState.traces);
+      const groundedCount = traces.filter((t) => t.grounded).length;
+      const groundedRate = traces.length ? `${Math.round((groundedCount / traces.length) * 100)}%` : "-";
+
+      document.getElementById("statDoc").textContent = docId;
+      document.getElementById("statChunks").textContent = String(dashboardState.chunks.length);
+      document.getElementById("statRelatives").textContent = String(dashboardState.relatives.length);
+      document.getElementById("statChats").textContent = String(traces.length);
+      document.getElementById("statGrounded").textContent = groundedRate;
+    }
+
+    function renderChunks() {
+      const root = document.getElementById("chunks");
+      const q = (document.getElementById("chunkFilter").value || "").toLocaleLowerCase("tr-TR").trim();
+      const items = dashboardState.chunks.filter((chunk) => {
+        if (!q) return true;
+        return [
+          chunk.id, chunk.section, chunk.breadcrumb, chunk.text, String(chunk.page_num),
+        ].join(" ").toLocaleLowerCase("tr-TR").includes(q);
+      });
+
+      if (!dashboardState.selectedDoc) {
+        root.innerHTML = '<div class="empty">Chunk verisini gormek icin once bir dokuman secin.</div>';
+        return;
+      }
+      if (!items.length) {
+        root.innerHTML = '<div class="empty">Filtreye uyan chunk bulunamadi.</div>';
+        return;
+      }
+
+      root.innerHTML = items.map((c, i) => `
+        <article class="chunk-card">
+          <div class="head-row">
+            <span class="badge">#${i + 1}</span>
+            <span class="badge">id: ${escapeHtml(c.id)}</span>
+            <span class="badge">page: ${c.page_num}</span>
+            <span class="badge">chunk_index: ${c.chunk_index}</span>
+            <span class="badge">tokens: ${c.token_count}</span>
+            <span class="badge">${escapeHtml(c.content_type)}</span>
+          </div>
+          <div class="block mono">section: ${escapeHtml(c.section)}\nbreadcrumb: ${escapeHtml(c.breadcrumb)}\nsource: ${escapeHtml(c.source)}</div>
+          <div style="height:10px"></div>
+          <div class="block">${escapeHtml(c.text)}</div>
+          <details>
+            <summary>Parent text ve metadata</summary>
+            <div class="block mono">${escapeHtml(c.parent_text || "")}</div>
+            <div style="height:10px"></div>
+            <div class="block mono">${escapeHtml(JSON.stringify(c.metadata || {}, null, 2))}</div>
+          </details>
+        </article>
+      `).join("");
+    }
+
+    function renderRelatives() {
+      const root = document.getElementById("relatives");
+      if (!dashboardState.selectedDoc) {
+        root.innerHTML = '<div class="empty">Relative question listesini gormek icin dokuman secin.</div>';
+        return;
+      }
+      if (!dashboardState.relatives.length) {
+        root.innerHTML = '<div class="empty">Bu dokuman icin relative question kaydi bulunamadi.</div>';
+        return;
+      }
+
+      root.innerHTML = dashboardState.relatives.map((item, i) => `
+        <article class="question-card">
+          <div class="head-row">
+            <span class="badge">#${i + 1}</span>
+            <span class="badge">chunk: ${escapeHtml(item.chunk_id)}</span>
+            <span class="badge">page: ${item.page_num}</span>
+            <span class="badge">${escapeHtml(item.section)}</span>
+          </div>
+          <div class="block">${escapeHtml(item.question)}</div>
+        </article>
+      `).join("");
+    }
+
+    function filterTracesBySelectedDoc(traces) {
+      const docId = dashboardState.selectedDoc;
+      if (!docId) return traces;
+      return traces.filter((trace) => {
+        const fromSources = (trace.sources || []).some((source) => source.document === docId);
+        const fromChunks = (trace.retrieved_chunks || []).some((chunk) => chunk.document === docId);
+        return fromSources || fromChunks;
+      });
+    }
+
+    function renderTraces() {
+      const root = document.getElementById("traces");
+      const q = (document.getElementById("traceFilter").value || "").toLocaleLowerCase("tr-TR").trim();
+      const traces = filterTracesBySelectedDoc(dashboardState.traces).filter((trace) => {
+        if (!q) return true;
+        return [
+          trace.query, trace.strategy_used, trace.answer,
+        ].join(" ").toLocaleLowerCase("tr-TR").includes(q);
+      });
+
+      if (!traces.length) {
+        root.innerHTML = '<div class="empty">Secili filtre icin chat trace bulunamadi.</div>';
+        dashboardState.activeTraceIndex = -1;
+        renderTraceDetail();
+        return;
+      }
+
+      if (dashboardState.activeTraceIndex === -1) dashboardState.activeTraceIndex = 0;
+      const activeKey = traces[dashboardState.activeTraceIndex]?.created_at;
+
+      root.innerHTML = traces.map((trace, index) => `
+        <article class="trace-card ${trace.created_at === activeKey ? "active" : ""}" onclick="selectTraceByCreatedAt(${trace.created_at})">
+          <div class="head-row">
+            <span class="badge">${escapeHtml(trace.strategy_used)}</span>
+            <span class="badge ${trace.grounded ? "" : "warn"}">${trace.grounded ? "grounded" : "not grounded"}</span>
+            <span class="badge">${formatTime(trace.created_at)}</span>
+          </div>
+          <div><strong>Soru:</strong> ${escapeHtml(preview(trace.query, 140))}</div>
+          <div class="muted" style="margin-top:8px;">${escapeHtml(preview(trace.answer, 180))}</div>
+        </article>
+      `).join("");
+
+      const exactIndex = traces.findIndex((trace) => trace.created_at === activeKey);
+      dashboardState.activeTraceIndex = exactIndex === -1 ? 0 : exactIndex;
+      renderTraceDetail();
+    }
+
+    function selectTraceByCreatedAt(createdAt) {
+      const traces = filterTracesBySelectedDoc(dashboardState.traces);
+      dashboardState.activeTraceIndex = traces.findIndex((trace) => trace.created_at === createdAt);
+      renderTraces();
+    }
+
+    function renderTraceDetail() {
+      const root = document.getElementById("traceDetail");
+      const traces = filterTracesBySelectedDoc(dashboardState.traces);
+      const trace = traces[dashboardState.activeTraceIndex];
+
+      if (!trace) {
+        root.className = "empty";
+        root.textContent = "Bir trace secildiginde retrieval ve citation detaylari burada gosterilir.";
+        return;
+      }
+
+      root.className = "";
+      const sources = (trace.sources || []).map((source, index) => `
+        <div class="list-item">
+          <strong>source #${index}</strong><br>
+          ${escapeHtml(source.document)} s.${source.page} · ${escapeHtml(source.section)} · score=${source.score}<br>
+          <span class="muted">highlight:</span> ${escapeHtml(source.highlight_text || source.chunk_text || "")}
+        </div>
+      `).join("");
+
+      const citations = (trace.citations || []).map((citation, index) => `
+        <div class="list-item">
+          <strong>citation #${index}</strong><br>
+          ${escapeHtml(citation.document)} s.${citation.page} → source_index=${citation.source_index}<br>
+          <span class="muted">context:</span> ${escapeHtml(citation.context || "")}<br>
+          <span class="muted">evidence:</span> ${escapeHtml(citation.evidence_text || "")}
+        </div>
+      `).join("");
+
+      const retrieved = (trace.retrieved_chunks || []).map((chunk) => `
+        <div class="list-item">
+          <strong>${escapeHtml(chunk.document)} · s.${chunk.page}</strong><br>
+          chunk_id=${escapeHtml(chunk.chunk_id)} · score=${chunk.score} · ${escapeHtml(chunk.section)}<br>
+          <span class="muted">${escapeHtml(chunk.preview || "")}</span>
+        </div>
+      `).join("");
+
+      root.innerHTML = `
+        <div class="panel" style="padding:0;border:none;box-shadow:none;background:transparent;">
+          <div class="panel-head" style="margin-bottom:10px;">
+            <div>
+              <div class="panel-title">Trace Detayi</div>
+              <div class="panel-sub">${formatTime(trace.created_at)} · strategy=${escapeHtml(trace.strategy_used)}</div>
+            </div>
+          </div>
+          <div class="chunk-card active">
+            <div class="head-row">
+              <span class="badge">${trace.grounded ? "grounded" : "not grounded"}</span>
+              <span class="badge">${(trace.sources || []).length} sources</span>
+              <span class="badge">${(trace.citations || []).length} citations</span>
+              <span class="badge">${(trace.retrieved_chunks || []).length} retrieved chunks</span>
+            </div>
+            <div class="label muted">Soru</div>
+            <div class="block">${escapeHtml(trace.query)}</div>
+            <div style="height:10px"></div>
+            <div class="label muted">Yanıt</div>
+            <div class="block">${escapeHtml(trace.answer)}</div>
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="split">
+            <div>
+              <div class="panel-title" style="font-size:13px;margin-bottom:8px;">Queries Tried</div>
+              <div class="list">${(trace.queries_tried || []).map((q) => `<div class="list-item mono">${escapeHtml(q)}</div>`).join("") || '<div class="empty">Kayit yok</div>'}</div>
+            </div>
+            <div>
+              <div class="panel-title" style="font-size:13px;margin-bottom:8px;">Citation Mapping</div>
+              <div class="list">${citations || '<div class="empty">Citation yok</div>'}</div>
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="panel-title" style="font-size:13px;margin-bottom:8px;">Selected Sources</div>
+          <div class="list">${sources || '<div class="empty">Source yok</div>'}</div>
+
+          <div style="height:12px"></div>
+          <div class="panel-title" style="font-size:13px;margin-bottom:8px;">Retrieved Chunk Candidates</div>
+          <div class="list">${retrieved || '<div class="empty">Retrieved chunk yok</div>'}</div>
+        </div>
+      `;
+    }
+
     async function deleteSelectedDoc() {
-      const select = document.getElementById("docSelect");
-      const docId = select.value;
+      const docId = dashboardState.selectedDoc;
       if (!docId) {
         setStatus("Silmek icin once dokuman secin.");
         return;
       }
-
-      const ok = confirm(`'${docId}' dokumani ve iliskili tum veriler silinsin mi?`);
-      if (!ok) return;
+      if (!confirm(`'${docId}' dokumani ve iliskili tum veriler silinsin mi?`)) return;
 
       setStatus(`${docId} siliniyor...`);
       try {
-        const res = await fetch(`${API}/documents/${encodeURIComponent(docId)}`, {
-          method: "DELETE",
-        });
+        const res = await fetch(`${API}/documents/${encodeURIComponent(docId)}`, { method: "DELETE" });
         const data = await res.json();
         if (!res.ok) {
           setStatus(`Silme hatasi: ${data.detail || "bilinmeyen hata"}`);
           return;
         }
-
-        setStatus(
-          `${docId} silindi. raw=${data.deleted_raw_chunks}, relatives=${data.deleted_relative_chunks}, files=${data.deleted_files}`
-        );
-        document.getElementById("chunks").innerHTML = "";
-        document.getElementById("summaryBox").textContent = "Dokuman silindi. Yeni secim yapin.";
-        await loadDocs();
+        dashboardState.selectedDoc = "";
+        dashboardState.activeTraceIndex = -1;
+        await refreshAll();
+        setStatus(`${docId} silindi.`);
       } catch {
         setStatus("Silme islemi basarisiz.");
       }
     }
 
-    loadDocs();
+    refreshAll();
   </script>
 </body>
 </html>

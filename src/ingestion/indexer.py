@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -29,19 +30,27 @@ from src.utils.llm import coerce_text_response, llm_call, parse_llm_json
 logger = logging.getLogger(__name__)
 
 RELATED_QUESTIONS_PROMPT = """\
-You are an HR knowledge assistant. Given the following HR document excerpt,
-generate 3-5 natural language questions an employee might ask that this chunk
-would answer. Also generate 1-2 follow-up questions.
+Sen bir IK dokumani analiz asistanisin. Asagidaki dokuman parcasina bakarak
+bir calisanin sorabilecegi TAM ve DOGAL sorular uret.
 
-Document chunk:
+Kurallar:
+- Ciktilar eksik ifade, baslik parcasi veya yarim cumle OLMAMALI.
+- Her oge tek basina anlamli, tam bir soru olmali.
+- Her soru mutlaka `?` ile bitmeli.
+- Sorular dokumanin diliyle ayni dilde olmali.
+- Sadece bu chunk'in cevaplayabilecegi sorular yaz.
+- Cok genel veya anlamsiz sorular yazma.
+- Her soruda mumkunse dokumandaki ana terimi koru.
+
+Dokuman chunk:
 \"\"\"
 {chunk_text}
 \"\"\"
 
-Section: {section}
-Source: {source} (page {page})
+Bolum: {section}
+Kaynak: {source} (sayfa {page})
 
-Return a JSON object:
+Yalnizca su formatta JSON don:
 {{
   "questions": ["question 1", "question 2", ...],
   "follow_ups": ["follow-up 1", ...]
@@ -49,6 +58,24 @@ Return a JSON object:
 """
 
 _MAX_WORKERS = 8   # thread pool size for parallel API calls
+_QUESTION_WORD_RE = re.compile(
+    r"\b(nasil|nedir|ne zaman|hangi|kim|kime|neden|niye|nerede|"
+    r"nereden|ne kadar|kac|kaç|m[ıiuü])\b",
+    re.IGNORECASE,
+)
+_INCOMPLETE_ENDINGS = (
+    " ve",
+    " veya",
+    " ya da",
+    " ile",
+    " gibi",
+    " icin",
+    " için",
+    " uzere",
+    " üzere",
+    " hakkinda",
+    " hakkında",
+)
 
 
 class DocumentIndexer:
@@ -248,7 +275,7 @@ class DocumentIndexer:
         }
 
         for raw in candidates:
-            q = " ".join(str(raw or "").split()).strip(" -•\t")
+            q = self._normalize_relative_question(str(raw or ""))
             if not q or q in seen:
                 continue
             if len(q) < min_len or len(q) > max_len:
@@ -262,7 +289,9 @@ class DocumentIndexer:
                 "bu konu nedir?",
             }:
                 continue
-            if len(q.split()) < 3:
+            if len(q.split()) < 4:
+                continue
+            if not self._looks_like_complete_question(q):
                 continue
             # Require some lexical grounding in the underlying chunk/section.
             q_terms = {tok.casefold().strip(".,:;!?()[]{}\"'") for tok in q.split()}
@@ -273,6 +302,35 @@ class DocumentIndexer:
             filtered.append(q)
 
         return filtered[:5]
+
+    @staticmethod
+    def _normalize_relative_question(raw: str) -> str:
+        q = " ".join(str(raw or "").split())
+        q = q.strip(" -•\t\"'")
+        q = re.sub(r"^(soru|question|follow[- ]?up)\s*:\s*", "", q, flags=re.IGNORECASE)
+        q = re.sub(r"\[[^\]]+\]", "", q)
+        q = re.sub(r"\s+", " ", q).strip()
+        q = q.rstrip(".,:;!-")
+        q = re.sub(r"\?+$", "", q).strip()
+        if not q:
+            return ""
+        q = q[0].upper() + q[1:] if len(q) > 1 else q.upper()
+        return f"{q}?"
+
+    @staticmethod
+    def _looks_like_complete_question(q: str) -> bool:
+        base = q[:-1].strip() if q.endswith("?") else q.strip()
+        lower = base.casefold()
+        if not base:
+            return False
+        if any(lower.endswith(ending) for ending in _INCOMPLETE_ENDINGS):
+            return False
+        if base.endswith(("(", "/", "-", ":", ",")):
+            return False
+        if not _QUESTION_WORD_RE.search(lower):
+            if not re.search(r"\b\w+m[ıiuü]\b", lower):
+                return False
+        return True
 
     def _batch_upsert(
         self,

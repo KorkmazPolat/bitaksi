@@ -3,10 +3,10 @@ Chat routes: the main employee-facing chat endpoint.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 
-from src.api.dependencies import get_chat_service
+from src.api.dependencies import get_chat_debug_store, get_chat_service
 from src.config import get_settings
 from src.generation.response_generator import ChatMessage
 from src.utils.enums import MessageRole
@@ -57,6 +57,28 @@ class ChatResponse(BaseModel):
     queries_tried: list[str]
 
 
+class DebugChunkRef(BaseModel):
+    chunk_id: str
+    page: int
+    section: str
+    score: float
+    document: str
+    preview: str
+    content_type: str
+
+
+class ChatDebugItem(BaseModel):
+    created_at: float
+    query: str
+    answer: str
+    grounded: bool
+    strategy_used: str
+    queries_tried: list[str]
+    sources: list[SourceRef]
+    citations: list[CitationRef]
+    retrieved_chunks: list[DebugChunkRef]
+
+
 @router.post("/", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
@@ -79,3 +101,24 @@ async def chat(
         grounded=result.grounded,
         queries_tried=result.queries_tried,
     )
+
+
+@router.get("/debug/recent", response_model=list[ChatDebugItem])
+async def recent_chat_debug(debug_store=Depends(get_chat_debug_store)):
+    items = debug_store.list()
+    return [
+        ChatDebugItem(
+            created_at=item["created_at"],
+            query=item["query"],
+            answer=item["answer"],
+            grounded=item["grounded"],
+            strategy_used=item["strategy_used"],
+            queries_tried=item["queries_tried"],
+            sources=[SourceRef(**source) for source in item["sources"]],
+            citations=[CitationRef(**citation) for citation in item["citations"]],
+            retrieved_chunks=[
+                DebugChunkRef(**chunk) for chunk in item["retrieved_chunks"]
+            ],
+        )
+        for item in items
+    ]

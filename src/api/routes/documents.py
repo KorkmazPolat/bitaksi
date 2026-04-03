@@ -63,6 +63,22 @@ class ChunkListResponse(BaseModel):
     chunks: list[ChunkDetail]
 
 
+class RelativeQuestionDetail(BaseModel):
+    id: str
+    chunk_id: str
+    source: str
+    page_num: int
+    section: str
+    question: str
+    metadata: dict
+
+
+class RelativeQuestionListResponse(BaseModel):
+    doc_id: str
+    total_questions: int
+    questions: list[RelativeQuestionDetail]
+
+
 class DeleteDocumentResponse(BaseModel):
     doc_id: str
     deleted_raw_chunks: int
@@ -315,6 +331,50 @@ def get_document_chunks(doc_id: str):
         doc_id=doc_id,
         total_chunks=len(chunks),
         chunks=chunks,
+    )
+
+
+@router.get("/{doc_id}/relatives", response_model=RelativeQuestionListResponse)
+def get_document_relatives(doc_id: str):
+    """Return generated relative questions for a document."""
+    settings = get_settings()
+    import chromadb
+
+    client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+    try:
+        col = client.get_collection(name=settings.chroma_collection_relatives)
+    except Exception:
+        return RelativeQuestionListResponse(doc_id=doc_id, total_questions=0, questions=[])
+
+    results = col.get(include=["documents", "metadatas"])
+    ids = results.get("ids", [])
+    docs = results.get("documents", [])
+    metas = results.get("metadatas", [])
+
+    questions: list[RelativeQuestionDetail] = []
+    for rid, question, meta in zip(ids, docs, metas):
+        m = meta or {}
+        source = str(m.get("source", ""))
+        stem = Path(source).stem if source else ""
+        if stem != doc_id:
+            continue
+        questions.append(
+            RelativeQuestionDetail(
+                id=str(rid),
+                chunk_id=str(m.get("chunk_id", "")),
+                source=source,
+                page_num=int(m.get("page_num", 0)),
+                section=str(m.get("section", "")),
+                question=str(question or ""),
+                metadata=m,
+            )
+        )
+
+    questions.sort(key=lambda item: (item.page_num, item.chunk_id, item.question))
+    return RelativeQuestionListResponse(
+        doc_id=doc_id,
+        total_questions=len(questions),
+        questions=questions,
     )
 
 
