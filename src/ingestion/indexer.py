@@ -269,11 +269,17 @@ class DocumentIndexer:
 
     @staticmethod
     def _chunk_metadata(c: TextChunk) -> dict:
+        # parent_text stored in metadata so generation layer can retrieve
+        # broader context without a second DB round-trip
         return {
             "doc_id": c.doc_id,
             "source": c.source,
             "page_num": c.page_num,
             "section": c.section_title,
+            "breadcrumb": c.breadcrumb,
             "chunk_index": c.chunk_index,
-            **{k: str(v) for k, v in c.metadata.items()},
+            "token_count": str(c.token_count),
+            "parent_text": c.parent_text[:2000],   # cap to avoid ChromaDB limits
+            **{k: str(v) for k, v in c.metadata.items()
+               if k not in ("section", "breadcrumb", "token_count")},
         }

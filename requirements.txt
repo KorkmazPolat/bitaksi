@@ -19,6 +19,10 @@ pdfplumber==0.11.4
 python-docx==1.1.2
 Pillow==11.0.0
 
+# Chunking
+nltk>=3.8.1
+tiktoken>=0.7.0
+
 # Utilities
 numpy<2.0
 tenacity==9.0.0
