@@ -11,6 +11,7 @@ Key design decisions:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -35,16 +36,39 @@ yanıt ver. Eğer yanıt bağlamda mevcut değilse, bunu açıkça belirt.
 4. Yanıtlar kısa, net ve uygulanabilir olmalıdır.
 5. Emin olmadığında, çalışanı doğrudan İK departmanıyla iletişime geçmeye yönlendir.
 6. Bağlamda tablo veya rakamlar varsa bunları yanıtına dahil et.
+7. Cevabı **doğrudan ver**; yalnızca "X için [doküman, s.Y]'ye bakınız" tarzı yönlendirme cümlesi yazma.
+8. Her önemli cümlenin sonunda citation kullan (örn. `[İK El Kitabı, s.12]`).
 
 ## Yanıt Formatı
-- Başlık veya kısa özet
-- Madde işaretli açıklama (gerekirse)
-- Kaynaklar bölümü: doküman adı, bölüm ve sayfa numarası
+- Kısa bir doğrudan cevap
+- Gerekirse madde işaretleri
+- Her maddede/cümlede kaynak citation
+- Eğer bilgi eksikse, eksik olan kısmı açıkça belirt
 
 ## YASAK
 - Bağlam dışından bilgi üretme (hallüsinasyon)
 - "Bilmiyorum ama tahmin ediyorum ki…" gibi spekülasyonlar
 - Kişisel görüş veya öneri (yalnızca politika aktarımı)
+- Sadece referansa yönlendiren boş cevap (ör. "detaylar için ... bakınız")
+"""
+
+REWRITE_PROMPT = """\
+Yanıtı yeniden yaz.
+
+Kurallar:
+1. Kullanıcı sorusuna doğrudan cevap ver.
+2. "bakınız", "detay için şu sayfaya bakın" gibi referansa yönlendiren tek cümle formatı kullanma.
+3. Her önemli cümlenin sonuna citation ekle: [Doküman, s.X]
+4. Bağlamda olmayan bilgi ekleme.
+
+Kullanıcı sorusu:
+{query}
+
+Bağlam:
+{context}
+
+Mevcut yetersiz yanıt:
+{answer}
 """
 
 NO_CONTEXT_MSG = """\
@@ -54,6 +78,10 @@ doğrudan **İK departmanıyla** iletişime geçin.
 """
 
 _UNKNOWN_DOC = "Bilinmeyen Doküman"
+_REFERENCE_ONLY_RE = re.compile(
+    r"(bakınız|bakiniz|detay.*için|detay.*icin|see\s+.*page|refer\s+to)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -106,6 +134,24 @@ class ResponseGenerator:
             messages=messages,
         )
         answer = response.strip()
+
+        if self._needs_rewrite(answer):
+            rewrite = llm_call(
+                model=self.model,
+                max_tokens=1500,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": REWRITE_PROMPT.format(
+                            query=query,
+                            context=context_block,
+                            answer=answer,
+                        ),
+                    }
+                ],
+            )
+            answer = rewrite.strip() or answer
 
         return GenerationResult(
             answer=answer,
@@ -166,3 +212,14 @@ class ResponseGenerator:
             ),
         })
         return messages
+
+    @staticmethod
+    def _needs_rewrite(answer: str) -> bool:
+        text = (answer or "").strip()
+        if not text:
+            return False
+        has_reference_only_phrase = bool(_REFERENCE_ONLY_RE.search(text))
+        has_citation = ("[") in text and ("s." in text or "p." in text)
+        # Very short directional answers are usually low quality for this project.
+        is_short = len(text) < 220
+        return has_reference_only_phrase and (is_short or not has_citation)

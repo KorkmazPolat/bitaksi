@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chunk Detaylari</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --primary: #2563eb;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .title { font-weight: 700; }
+    .spacer { flex: 1; }
+
+    .btn, select, .link-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .btn { cursor: pointer; }
+
+    #status {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main {
+      padding: 14px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .summary {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .chunk {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .chunk-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .label {
+      margin: 10px 0 6px;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .block {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      font-family: "Consolas", "Menlo", monospace;
+      font-size: 12px;
+      background: #fcfcfd;
+      overflow-x: auto;
+    }
+
+    details { margin-top: 8px; }
+    summary { cursor: pointer; color: var(--primary); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">Chunk Detaylari</div>
+    <span id="status">Hazir</span>
+    <div class="spacer"></div>
+    <a class="link-btn" href="/">Sohbet</a>
+    <button class="btn" onclick="loadDocs()">Yenile</button>
+    <button class="btn" onclick="deleteSelectedDoc()">Dokumani Sil</button>
+    <select id="docSelect" onchange="loadChunks()">
+      <option value="">Dokuman secin</option>
+    </select>
+  </header>
+
+  <main>
+    <section class="summary" id="summaryBox">
+      Bu sayfada secilen dokumanin tum chunk'lari ve metadata bilgileri listelenir.
+    </section>
+
+    <div id="chunks"></div>
+  </main>
+
+  <script>
+    const API = "";
+
+    function setStatus(t) {
+      document.getElementById("status").textContent = t;
+    }
+
+    function escapeHtml(s) {
+      return (s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    async function loadDocs() {
+      setStatus("Dokuman listesi yukleniyor...");
+      const select = document.getElementById("docSelect");
+
+      try {
+        const res = await fetch(`${API}/documents/`);
+        const docs = await res.json();
+
+        docs.sort((a, b) => a.doc_id.localeCompare(b.doc_id));
+        select.innerHTML = '<option value="">Dokuman secin</option>';
+
+        for (const d of docs) {
+          const opt = document.createElement("option");
+          opt.value = d.doc_id;
+          opt.textContent = `${d.doc_id} (max_page=${d.max_page})`;
+          select.appendChild(opt);
+        }
+
+        setStatus(`${docs.length} dokuman bulundu.`);
+      } catch {
+        setStatus("Dokumanlar yuklenemedi.");
+      }
+    }
+
+    async function loadChunks() {
+      const docId = document.getElementById("docSelect").value;
+      const chunksEl = document.getElementById("chunks");
+      const summaryEl = document.getElementById("summaryBox");
+
+      if (!docId) {
+        chunksEl.innerHTML = "";
+        summaryEl.textContent = "Dokuman seciniz.";
+        return;
+      }
+
+      setStatus(`${docId} chunk verileri yukleniyor...`);
+      chunksEl.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API}/documents/${encodeURIComponent(docId)}/chunks`);
+        const data = await res.json();
+
+        summaryEl.innerHTML = `
+          <strong>doc_id:</strong> ${escapeHtml(data.doc_id)}<br>
+          <strong>total_chunks:</strong> ${data.total_chunks}<br>
+          Asagida tum chunk kayitlari listelenmistir.
+        `;
+
+        if (!data.chunks || data.chunks.length === 0) {
+          chunksEl.innerHTML = '<section class="summary">Chunk bulunamadi.</section>';
+          setStatus("Chunk bulunamadi.");
+          return;
+        }
+
+        const frag = document.createDocumentFragment();
+
+        data.chunks.forEach((c, i) => {
+          const card = document.createElement("article");
+          card.className = "chunk";
+          card.innerHTML = `
+            <div class="chunk-head">
+              <span class="badge">#${i + 1}</span>
+              <span class="badge">id: ${escapeHtml(c.id)}</span>
+              <span class="badge">page: ${c.page_num}</span>
+              <span class="badge">chunk_index: ${c.chunk_index}</span>
+              <span class="badge">tokens: ${c.token_count}</span>
+              <span class="badge">type: ${escapeHtml(c.content_type)}</span>
+            </div>
+
+            <div class="label">Kaynak</div>
+            <div class="block">source: ${escapeHtml(c.source)}\nsection: ${escapeHtml(c.section)}\nbreadcrumb: ${escapeHtml(c.breadcrumb)}</div>
+
+            <div class="label">Chunk Text</div>
+            <div class="block">${escapeHtml(c.text)}</div>
+
+            <details>
+              <summary>Parent Text</summary>
+              <div class="block">${escapeHtml(c.parent_text || "")}</div>
+            </details>
+
+            <details>
+              <summary>Raw Metadata JSON</summary>
+              <div class="block">${escapeHtml(JSON.stringify(c.metadata, null, 2))}</div>
+            </details>
+          `;
+          frag.appendChild(card);
+        });
+
+        chunksEl.appendChild(frag);
+        setStatus(`${data.total_chunks} chunk gosteriliyor.`);
+      } catch {
+        chunksEl.innerHTML = '<section class="summary">Chunk detaylari alinamadi.</section>';
+        setStatus("Chunk detaylari alinamadi.");
+      }
+    }
+
+    async function deleteSelectedDoc() {
+      const select = document.getElementById("docSelect");
+      const docId = select.value;
+      if (!docId) {
+        setStatus("Silmek icin once dokuman secin.");
+        return;
+      }
+
+      const ok = confirm(`'${docId}' dokumani ve iliskili tum veriler silinsin mi?`);
+      if (!ok) return;
+
+      setStatus(`${docId} siliniyor...`);
+      try {
+        const res = await fetch(`${API}/documents/${encodeURIComponent(docId)}`, {
+          method: "DELETE",
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setStatus(`Silme hatasi: ${data.detail || "bilinmeyen hata"}`);
+          return;
+        }
+
+        setStatus(
+          `${docId} silindi. raw=${data.deleted_raw_chunks}, relatives=${data.deleted_relative_chunks}, files=${data.deleted_files}`
+        );
+        document.getElementById("chunks").innerHTML = "";
+        document.getElementById("summaryBox").textContent = "Dokuman silindi. Yeni secim yapin.";
+        await loadDocs();
+      } catch {
+        setStatus("Silme islemi basarisiz.");
+      }
+    }
+
+    loadDocs();
+  </script>
+</body>
+</html>

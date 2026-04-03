@@ -130,12 +130,12 @@ class SmartGroundingRetriever:
             decomp_chunks.extend(self._retrieve_and_augment(sub_q, self.top_k))
         chunks = _deduplicate(decomp_chunks)[: self.fallback_top_k]
 
-        if chunks:
+        if self._sufficient(chunks):
             return RetrievalResult(
                 chunks=chunks,
                 strategy_used=RetrievalStrategy.DECOMPOSITION,
                 queries_tried=queries_tried,
-                grounded=bool(chunks),
+                grounded=True,
             )
 
         # ── No grounded context found ────────────────────────────────────
@@ -160,14 +160,13 @@ class SmartGroundingRetriever:
 
         # Relatives lookup: a matched question → its parent chunk ID
         relative_hits = self.relatives.retrieve(query, top_k=top_k)
-        parent_ids = list({
-            meta.get("chunk_id", "")
-            for hit in relative_hits
-            for meta in [{}]   # relatives metadata stored in collection.get
-        })
-        # Fetch parent chunk IDs from the relatives hit metadata directly
         parent_ids = self._parent_ids_from_hits(relative_hits)
-        parent_chunks = self.raw.fetch_by_ids(parent_ids)
+        parent_score_map = self._parent_score_map(relative_hits)
+        parent_chunks = self.raw.fetch_by_ids(
+            parent_ids,
+            score_map=parent_score_map,
+            default_score=0.0,
+        )
 
         return _deduplicate(raw_chunks + parent_chunks)
 
@@ -188,6 +187,24 @@ class SmartGroundingRetriever:
                 seen.add(cid)
                 ids.append(cid)
         return ids
+
+    @staticmethod
+    def _parent_score_map(hits: list[RetrievedChunk]) -> dict[str, float]:
+        """
+        Assign parent chunks a conservative score derived from the relatives hit
+        instead of inflating them to 1.0. This prevents false grounded answers.
+        """
+        out: dict[str, float] = {}
+        for hit in hits:
+            cid = hit.chunk_id
+            if not cid:
+                continue
+            # Penalize relatives score so direct raw matches stay dominant.
+            score = max(0.0, min(1.0, float(hit.score) * 0.9))
+            prev = out.get(cid, 0.0)
+            if score > prev:
+                out[cid] = score
+        return out
 
     def _sufficient(self, chunks: list[RetrievedChunk]) -> bool:
         above = [c for c in chunks if c.score >= self.threshold]

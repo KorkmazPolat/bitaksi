@@ -4,7 +4,8 @@
       "Bash(/usr/local/bin/python3.11 -m venv .venv)",
       "Bash(.venv/bin/python --version)",
       "Bash(.venv/bin/pip install:*)",
-      "Bash(.venv/bin/python -c \"import numpy; print\\(numpy.__version__\\)\")"
+      "Bash(.venv/bin/python -c \"import numpy; print\\(numpy.__version__\\)\")",
+      "Bash(find /Users/polatkorkmaz/Documents/GitHub/bitaksi -maxdepth 3 -type d -not -path */.venv* -not -path */__pycache__* -not -path */.git*)"
     ]
   }
 }
