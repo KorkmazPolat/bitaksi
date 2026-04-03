@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 
 from src.config import get_settings
-from src.utils.llm import llm_call
+from src.utils.llm import coerce_text_response, llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class HyDERetrieval:
                     {"role": "user", "content": HYDE_PROMPT.format(query=query)}
                 ],
             )
-            return response.strip()
+            return coerce_text_response(response).strip()
         except Exception as exc:
             logger.warning("HyDE hypothesis generation failed: %s", exc)
             return query

@@ -24,7 +24,7 @@ from src.ingestion.document_processor import DocumentPage, DocumentProcessor
 from src.ingestion.semantic_chunker import SemanticChunker, TextChunk
 from src.ingestion.vision_extractor import VisionExtractor
 from src.utils.enums import ContentType
-from src.utils.llm import llm_call, parse_llm_json
+from src.utils.llm import coerce_text_response, llm_call, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -192,9 +192,13 @@ class DocumentIndexer:
                 max_tokens=512,
                 messages=[{"role": "user", "content": prompt}],
             )
-            data = parse_llm_json(response)
+            data = parse_llm_json(coerce_text_response(response))
             results: list[dict] = []
-            for q in data.get("questions", []) + data.get("follow_ups", []):
+            candidates = self._filter_relative_candidates(
+                data.get("questions", []) + data.get("follow_ups", []),
+                chunk=chunk,
+            )
+            for q in candidates:
                 q_id = "q_" + hashlib.md5(
                     f"{chunk.chunk_id}:{q}".encode()
                 ).hexdigest()
@@ -222,6 +226,53 @@ class DocumentIndexer:
                     )
 
         return relatives
+
+    def _filter_relative_candidates(
+        self,
+        candidates: list[str],
+        *,
+        chunk: TextChunk,
+    ) -> list[str]:
+        """Drop low-signal LLM-generated questions before indexing."""
+        seen: set[str] = set()
+        filtered: list[str] = []
+        min_len = self.settings.min_relative_question_length
+        max_len = self.settings.max_relative_question_length
+        anchor_terms = {
+            token.casefold()
+            for token in (
+                chunk.section_title.split()
+                + chunk.text.replace("\n", " ").split()
+            )
+            if len(token) >= 5
+        }
+
+        for raw in candidates:
+            q = " ".join(str(raw or "").split()).strip(" -•\t")
+            if not q or q in seen:
+                continue
+            if len(q) < min_len or len(q) > max_len:
+                continue
+            if q.count("?") > 1:
+                continue
+            normalized = q.casefold()
+            if normalized in {
+                "bu nedir?",
+                "detay nedir?",
+                "bu konu nedir?",
+            }:
+                continue
+            if len(q.split()) < 3:
+                continue
+            # Require some lexical grounding in the underlying chunk/section.
+            q_terms = {tok.casefold().strip(".,:;!?()[]{}\"'") for tok in q.split()}
+            q_terms = {tok for tok in q_terms if len(tok) >= 5}
+            if anchor_terms and q_terms and not (q_terms & anchor_terms):
+                continue
+            seen.add(q)
+            filtered.append(q)
+
+        return filtered[:5]
 
     def _batch_upsert(
         self,

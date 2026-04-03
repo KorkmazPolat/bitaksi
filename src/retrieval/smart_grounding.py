@@ -17,6 +17,7 @@ must refuse to answer if no grounded context is found.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
 from src.config import get_settings
@@ -27,6 +28,7 @@ from src.retrieval.query_decomposition import QueryDecomposer
 from src.utils.enums import RetrievalStrategy
 
 logger = logging.getLogger(__name__)
+_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
 
 @dataclass
@@ -53,7 +55,7 @@ class SmartGroundingRetriever:
     Ensures every answer is grounded in retrieved document evidence.
     """
 
-    MIN_RESULTS = 2
+    MIN_RESULTS = 1
 
     def __init__(
         self,
@@ -66,6 +68,12 @@ class SmartGroundingRetriever:
         self.threshold = settings.similarity_threshold
         self.top_k = settings.top_k
         self.fallback_top_k = settings.fallback_top_k
+        lexical_overlap_weight = getattr(settings, "lexical_overlap_weight", 0.15)
+        self.lexical_overlap_weight = (
+            float(lexical_overlap_weight)
+            if isinstance(lexical_overlap_weight, (int, float))
+            else 0.15
+        )
 
         self.expander = QueryExpander()
         self.hyde = HyDERetrieval()
@@ -168,7 +176,8 @@ class SmartGroundingRetriever:
             default_score=0.0,
         )
 
-        return _deduplicate(raw_chunks + parent_chunks)
+        merged = _deduplicate(raw_chunks + parent_chunks)
+        return self._rerank(query, merged)
 
     @staticmethod
     def _parent_ids_from_hits(hits: list[RetrievedChunk]) -> list[str]:
@@ -209,3 +218,44 @@ class SmartGroundingRetriever:
     def _sufficient(self, chunks: list[RetrievedChunk]) -> bool:
         above = [c for c in chunks if c.score >= self.threshold]
         return len(above) >= self.MIN_RESULTS
+
+    def _rerank(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+    ) -> list[RetrievedChunk]:
+        query_terms = self._normalized_terms(query)
+        ranked: list[RetrievedChunk] = []
+        for chunk in chunks:
+            text_terms = self._normalized_terms(
+                f"{chunk.section}\n{chunk.text[:400]}"
+            )
+            overlap = (
+                len(query_terms & text_terms) / max(len(query_terms), 1)
+                if query_terms else 0.0
+            )
+            adjusted_score = max(
+                0.0,
+                min(1.0, chunk.score + (overlap * self.lexical_overlap_weight))
+            )
+            ranked.append(
+                RetrievedChunk(
+                    chunk_id=chunk.chunk_id,
+                    text=chunk.text,
+                    source=chunk.source,
+                    page_num=chunk.page_num,
+                    section=chunk.section,
+                    score=adjusted_score,
+                    doc_id=chunk.doc_id,
+                    content_type=chunk.content_type,
+                )
+            )
+        return sorted(ranked, key=lambda c: c.score, reverse=True)
+
+    @staticmethod
+    def _normalized_terms(text: str) -> set[str]:
+        return {
+            tok.casefold()
+            for tok in _TOKEN_RE.findall(text or "")
+            if len(tok) >= 4
+        }

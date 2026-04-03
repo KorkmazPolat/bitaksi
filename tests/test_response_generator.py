@@ -55,6 +55,7 @@ def test_no_context_returns_ungrounded():
     assert result.grounded is False
     assert result.answer == NO_CONTEXT_MSG
     assert result.sources == []
+    assert "ilgili kaynak" in result.answer.lower()
 
 
 def test_source_deduplication():
@@ -77,3 +78,27 @@ def test_source_deduplication():
 
     pages = [s["page"] for s in result.sources]
     assert len(pages) == len(set(pages))
+
+
+def test_limits_sources_for_generation_context():
+    chunks = [
+        RetrievedChunk(
+            chunk_id=f"c{i}",
+            text=f"Chunk {i}",
+            source="/docs/hr_policy.pdf",
+            page_num=i,
+            section=f"Section {i}",
+            score=1.0 - (i * 0.01),
+        )
+        for i in range(1, 6)
+    ]
+    retrieval = RetrievalResult(
+        chunks=chunks, strategy_used=RetrievalStrategy.DIRECT, grounded=True
+    )
+
+    with patch("src.utils.llm.llm_call", return_value=_mock_message("answer")):
+        from src.generation.response_generator import ResponseGenerator
+        result = ResponseGenerator().generate("query", retrieval)
+
+    assert len(result.sources) <= 3
+    assert result.sources[0]["page"] == 1

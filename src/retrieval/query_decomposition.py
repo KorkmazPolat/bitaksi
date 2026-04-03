@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 
 from src.config import get_settings
-from src.utils.llm import llm_call, parse_llm_json
+from src.utils.llm import coerce_text_response, llm_call, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class QueryDecomposer:
                     {"role": "user", "content": DECOMP_PROMPT.format(query=query)}
                 ],
             )
-            sub_questions = parse_llm_json(response)
+            sub_questions = parse_llm_json(coerce_text_response(response))
             return sub_questions if sub_questions else [query]
         except Exception as exc:
             logger.warning("Query decomposition failed: %s", exc)

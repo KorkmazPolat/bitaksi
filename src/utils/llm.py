@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from functools import lru_cache
 
 import openai
@@ -61,13 +62,109 @@ def parse_llm_json(text: str) -> dict | list:
         ```
     and bare JSON strings alike.
     """
-    text = text.strip()
+    cleaned = _clean_llm_json_text(text)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        repaired = _repair_json_text(cleaned)
+        return json.loads(repaired)
+
+
+def coerce_text_response(response) -> str:
+    """Normalize SDK- or test-style responses into plain text."""
+    if isinstance(response, str):
+        return response
+    content = getattr(response, "content", None)
+    if isinstance(content, list) and content:
+        text = getattr(content[0], "text", None)
+        if isinstance(text, str):
+            return text
+    text = getattr(response, "text", None)
+    if isinstance(text, str):
+        return text
+    return str(response or "")
+
+
+def _clean_llm_json_text(text: str) -> str:
+    text = coerce_text_response(text).strip()
     if text.startswith("```"):
-        # drop opening fence line
-        text = text.split("```", maxsplit=2)[1]
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text.strip())
+        parts = text.split("```")
+        if len(parts) >= 2:
+            text = parts[1]
+            if text.startswith("json"):
+                text = text[4:]
+    text = text.strip()
+    extracted = _extract_json_region(text)
+    return extracted.strip()
+
+
+def _extract_json_region(text: str) -> str:
+    starts = [idx for idx in (text.find("{"), text.find("[")) if idx != -1]
+    if not starts:
+        return text
+    start = min(starts)
+    return text[start:]
+
+
+def _repair_json_text(text: str) -> str:
+    text = text.strip()
+    text = _close_unterminated_string(text)
+    text = _balance_json_delimiters(text)
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+    return text
+
+
+def _close_unterminated_string(text: str) -> str:
+    escaped = False
+    in_string = False
+    out: list[str] = []
+    for ch in text:
+        out.append(ch)
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+        elif in_string and ch == "\n":
+            out[-1] = "\\n"
+    if in_string:
+        out.append('"')
+    return "".join(out)
+
+
+def _balance_json_delimiters(text: str) -> str:
+    stack: list[str] = []
+    escaped = False
+    in_string = False
+    out: list[str] = []
+
+    for ch in text:
+        out.append(ch)
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if stack and ch == stack[-1]:
+                stack.pop()
+            else:
+                out.pop()
+
+    while stack:
+        out.append(stack.pop())
+    return "".join(out)
 
 
 @retry(

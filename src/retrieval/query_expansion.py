@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 
 from src.config import get_settings
-from src.utils.llm import llm_call, parse_llm_json
+from src.utils.llm import coerce_text_response, llm_call, parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class QueryExpander:
                     }
                 ],
             )
-            variants = parse_llm_json(response)
+            variants = parse_llm_json(coerce_text_response(response))
             seen = {query}
             result = [query]
             for v in variants:

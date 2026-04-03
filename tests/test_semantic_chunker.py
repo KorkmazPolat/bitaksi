@@ -170,6 +170,18 @@ def test_multi_page_chunk_indices_unique():
     assert len(indices) == len(set(indices))
 
 
+def test_cross_page_sections_are_merged():
+    chunker = _chunker(min_tokens=1)
+    pages = [
+        _page("1. Politika\nBu bolum ilk sayfada baslar.", page_num=1),
+        _page("1. Politika\nBu bolum ikinci sayfada devam eder.", page_num=2),
+    ]
+    sections = chunker._build_document_sections(pages)
+    assert len(sections) == 1
+    assert sections[0].page_start == 1
+    assert sections[0].page_end == 2
+
+
 def test_parent_text_stored():
     chunker = _chunker(min_tokens=1)
     page = _page("1. Bölüm\nBu bölümün içeriği burada yer almaktadır.")

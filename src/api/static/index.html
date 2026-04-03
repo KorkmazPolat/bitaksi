@@ -67,16 +67,22 @@
     .btn.primary:hover { background: var(--primary-strong); }
 
     .app {
-      position: relative;
       flex: 1;
       min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 0;
+      transition: grid-template-columns 320ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    .app.drawer-open {
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 46vw);
     }
 
     .layout {
       height: 100%;
       padding: 14px;
-      display: grid;
-      grid-template-columns: 1fr;
+      min-width: 0;
+      display: block;
     }
 
     .card {
@@ -122,6 +128,19 @@
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+    }
+
+    .sources-block {
+      margin-top: 10px;
+    }
+
+    .sources-label {
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .src-chip {
@@ -180,19 +199,17 @@
     }
 
     .drawer {
-      position: absolute;
-      top: 0;
-      right: 0;
       height: 100%;
-      width: min(760px, 100%);
+      width: 100%;
       background: #fff;
+      min-width: 0;
       border-left: 1px solid var(--line);
       box-shadow: -10px 0 30px rgba(0,0,0,0.12);
       transform: translateX(102%);
       transition: transform 320ms cubic-bezier(.2,.8,.2,1);
-      z-index: 1000;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     .drawer.open { transform: translateX(0); }
@@ -276,7 +293,20 @@
 
     @media (max-width: 900px) {
       .msg { max-width: 92%; }
-      .drawer { width: 100%; }
+      .app {
+        position: relative;
+        display: block;
+      }
+      .app.drawer-open {
+        grid-template-columns: none;
+      }
+      .drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100%;
+        z-index: 1000;
+      }
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -356,15 +386,54 @@
     }
 
     function openDrawer() {
+      const app = document.querySelector(".app");
       const drawer = document.getElementById("pdfDrawer");
+      app.classList.add("drawer-open");
       drawer.classList.add("open");
       drawer.setAttribute("aria-hidden", "false");
     }
 
     function closeDrawer() {
+      const app = document.querySelector(".app");
       const drawer = document.getElementById("pdfDrawer");
       drawer.classList.remove("open");
       drawer.setAttribute("aria-hidden", "true");
+      app.classList.remove("drawer-open");
+    }
+
+    function extractCitedPages(text) {
+      const cited = new Set();
+      const raw = text || "";
+      const re = /\[([^,\]]+),\s*s\.(\d+)\]/g;
+      let m;
+      while ((m = re.exec(raw)) !== null) {
+        const doc = (m[1] || "").trim().toLowerCase();
+        const page = Number(m[2] || "1");
+        cited.add(`${doc}:${page}`);
+      }
+      return cited;
+    }
+
+    function buildSourcesBlock(label, items, onClickFactory) {
+      const block = document.createElement("div");
+      block.className = "sources-block";
+
+      const title = document.createElement("div");
+      title.className = "sources-label";
+      title.textContent = label;
+      block.appendChild(title);
+
+      const row = document.createElement("div");
+      row.className = "sources";
+      items.forEach((s, i) => {
+        const chip = document.createElement("button");
+        chip.className = "src-chip";
+        chip.textContent = `${s.document} s.${s.page}`;
+        chip.onclick = () => onClickFactory(s, i);
+        row.appendChild(chip);
+      });
+      block.appendChild(row);
+      return block;
     }
 
     function addMessage(role, text, sources = []) {
@@ -374,16 +443,30 @@
       div.innerHTML = role === "bot" ? renderBotTextWithCitations(text) : escapeHtml(text).replace(/\n/g, "<br>");
 
       if (sources.length) {
-        const src = document.createElement("div");
-        src.className = "sources";
+        const citedPages = extractCitedPages(text);
+        const primary = [];
+        const secondary = [];
+
         sources.forEach((s, i) => {
-          const chip = document.createElement("button");
-          chip.className = "src-chip";
-          chip.textContent = `${s.document} s.${s.page}`;
-          chip.onclick = () => showAnswerOnDocument(i);
-          src.appendChild(chip);
+          const key = `${String(s.document || "").trim().toLowerCase()}:${Number(s.page) || 1}`;
+          if (citedPages.has(key)) {
+            primary.push({ ...s, _sourceIndex: i });
+          } else {
+            secondary.push({ ...s, _sourceIndex: i });
+          }
         });
-        div.appendChild(src);
+
+        if (primary.length) {
+          div.appendChild(
+            buildSourcesBlock("Ana kaynaklar", primary, (s) => showAnswerOnDocument(s._sourceIndex))
+          );
+        }
+
+        if (secondary.length) {
+          div.appendChild(
+            buildSourcesBlock("Ek baglam", secondary, (s) => showAnswerOnDocument(s._sourceIndex))
+          );
+        }
       }
 
       wrap.appendChild(div);

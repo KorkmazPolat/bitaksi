@@ -51,6 +51,7 @@ from typing import Optional
 import numpy as np
 
 from src.ingestion.document_processor import DocumentPage
+from src.utils.llm import coerce_text_response, llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,16 @@ class TextChunk:
     metadata: dict = field(default_factory=dict)
 
 
+@dataclass
+class _DocumentSection:
+    page_start: int
+    page_end: int
+    source: str
+    doc_id: str
+    metadata: dict
+    section: _Section
+
+
 # ---------------------------------------------------------------------------
 # Token helpers
 # ---------------------------------------------------------------------------
@@ -207,12 +218,22 @@ class HierarchicalSemanticChunker:
         embedding_model: str = "all-MiniLM-L6-v2",
         use_contextual_enrichment: bool = False,
     ):
+        from src.config import get_settings
+
+        settings = get_settings()
         self.max_tokens = max_tokens
         self.overlap_tokens = overlap_tokens
         self.min_tokens = min_tokens
         self.semantic_percentile = semantic_percentile
         self.embedding_model = embedding_model
         self.use_contextual_enrichment = use_contextual_enrichment
+        self.contextual_enrichment_min_tokens = (
+            settings.contextual_enrichment_min_tokens
+        )
+        self.contextual_enrichment_max_chars = (
+            settings.contextual_enrichment_max_chars
+        )
+        self.llm_model = settings.llm_model
         self._embed_model = _get_embed_model(embedding_model)
 
     # ------------------------------------------------------------------
@@ -223,12 +244,78 @@ class HierarchicalSemanticChunker:
         chunks: list[TextChunk] = []
         chunk_index = 0
 
-        for page in pages:
-            for chunk in self._process_page(page, chunk_index):
+        for section in self._build_document_sections(pages):
+            for chunk in self._process_document_section(section, chunk_index):
                 chunks.append(chunk)
                 chunk_index += 1
 
         return chunks
+
+    def _build_document_sections(
+        self, pages: list[DocumentPage]
+    ) -> list[_DocumentSection]:
+        merged_sections: list[_DocumentSection] = []
+        ordered_pages = sorted(pages, key=lambda p: p.page_num)
+
+        for page in ordered_pages:
+            sections = self._parse_sections(page.text)
+            for section in sections:
+                if not section.text.strip():
+                    continue
+
+                if merged_sections and self._should_merge_sections(
+                    merged_sections[-1], section, page.page_num
+                ):
+                    prev = merged_sections[-1]
+                    prev.section.text = f"{prev.section.text}\n{section.text}".strip()
+                    prev.page_end = page.page_num
+                    prev.metadata = {**prev.metadata, **page.metadata}
+                    continue
+
+                merged_sections.append(
+                    _DocumentSection(
+                        page_start=page.page_num,
+                        page_end=page.page_num,
+                        source=page.source,
+                        doc_id=page.doc_id,
+                        metadata=dict(page.metadata),
+                        section=_Section(
+                            level=section.level,
+                            title=section.title,
+                            text=section.text,
+                            breadcrumb=section.breadcrumb,
+                        ),
+                    )
+                )
+
+        return merged_sections
+
+    @staticmethod
+    def _is_generic_section_title(title: str) -> bool:
+        normalized = (title or "").strip().lower()
+        return normalized in {"", "introduction", "giriş", "genel", "section"}
+
+    def _should_merge_sections(
+        self,
+        previous: _DocumentSection,
+        current: _Section,
+        current_page: int,
+    ) -> bool:
+        if current_page != previous.page_end + 1:
+            return False
+
+        prev_title = (previous.section.title or "").strip()
+        curr_title = (current.title or "").strip()
+        prev_breadcrumb = (previous.section.breadcrumb or "").strip()
+        curr_breadcrumb = (current.breadcrumb or "").strip()
+
+        if prev_title and curr_title and prev_title == curr_title:
+            return True
+        if prev_breadcrumb and curr_breadcrumb and prev_breadcrumb == curr_breadcrumb:
+            return True
+        if self._is_generic_section_title(prev_title) and self._is_generic_section_title(curr_title):
+            return True
+        return False
 
     # ------------------------------------------------------------------
     # Layer 1 — Structural parse
@@ -382,6 +469,8 @@ class HierarchicalSemanticChunker:
                 final.append(text)
                 continue
 
+            safe_overlap = max(0, min(self.overlap_tokens, self.max_tokens - 1))
+
             if _HAS_TIKTOKEN:
                 tokens = _encode_tokens(text)
                 start = 0
@@ -390,19 +479,19 @@ class HierarchicalSemanticChunker:
                     final.append(_decode_tokens(tokens[start:end]))
                     if end >= len(tokens):
                         break
-                    start = end - self.overlap_tokens
+                    start = max(start + 1, end - safe_overlap)
             else:
                 # Word-based fallback
                 words = text.split()
                 start = 0
                 wsize = self.max_tokens          # approx 1 word ≈ 1.3 tokens
-                woverlap = self.overlap_tokens
+                woverlap = safe_overlap
                 while start < len(words):
                     end = min(start + wsize, len(words))
                     final.append(" ".join(words[start:end]))
                     if end >= len(words):
                         break
-                    start = end - woverlap
+                    start = max(start + 1, end - woverlap)
 
         return [c for c in final if c.strip()]
 
@@ -416,65 +505,115 @@ class HierarchicalSemanticChunker:
             return f"Bölüm: {breadcrumb}\n\n{chunk_text}"
         return chunk_text
 
+    def _contextualize(
+        self,
+        *,
+        chunk_text: str,
+        parent_text: str,
+        breadcrumb: str,
+        page_start: int,
+        page_end: int,
+    ) -> str:
+        enriched = self._enrich(chunk_text, breadcrumb)
+        if not self.use_contextual_enrichment:
+            return enriched
+        if _count_tokens(chunk_text) < self.contextual_enrichment_min_tokens:
+            return enriched
+
+        parent_preview = parent_text[: self.contextual_enrichment_max_chars]
+        page_label = (
+            f"sayfa {page_start}" if page_start == page_end
+            else f"sayfa {page_start}-{page_end}"
+        )
+        prompt = f"""Aşağıdaki belge parçası için embedding'e yardımcı olacak kısa bir bağlamsal özet üret.
+Kurallar:
+- En fazla 2 kısa cümle yaz.
+- Sadece chunk'ın belge içindeki yerini ve neyi anlattığını özetle.
+- Yeni bilgi ekleme.
+
+Bölüm: {breadcrumb or 'Belirsiz'}
+Sayfa aralığı: {page_label}
+Üst bölüm özeti:
+{parent_preview}
+
+Chunk:
+{chunk_text}
+"""
+        try:
+            response = llm_call(
+                model=self.llm_model,
+                max_tokens=180,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            summary = coerce_text_response(response).strip()
+            if summary:
+                return f"Bağlam: {summary}\n\n{enriched}"
+        except Exception as exc:
+            logger.warning("Contextual enrichment failed: %s", exc)
+        return enriched
+
     # ------------------------------------------------------------------
     # Page → chunks
     # ------------------------------------------------------------------
 
-    def _process_page(
-        self, page: DocumentPage, start_index: int
+    def _process_document_section(
+        self, doc_section: _DocumentSection, start_index: int
     ) -> list[TextChunk]:
         chunks: list[TextChunk] = []
         idx = start_index
 
-        sections = self._parse_sections(page.text)
+        section = doc_section.section
+        parent_text = section.text
+        sentences = self._sentences(section.text)
+        groups = self._semantic_groups(sentences)
+        sized_texts = self._token_size_chunks(groups)
 
-        for section in sections:
-            if not section.text.strip():
+        for raw_text in sized_texts:
+            if not raw_text.strip():
                 continue
 
-            parent_text = section.text   # full section → stored in metadata
+            if _count_tokens(raw_text) < self.min_tokens:
+                continue
 
-            # Layers 2-4
-            sentences = self._sentences(section.text)
-            groups = self._semantic_groups(sentences)
-            sized_texts = self._token_size_chunks(groups)
+            enriched = self._contextualize(
+                chunk_text=raw_text,
+                parent_text=parent_text,
+                breadcrumb=section.breadcrumb,
+                page_start=doc_section.page_start,
+                page_end=doc_section.page_end,
+            )
 
-            for raw_text in sized_texts:
-                if not raw_text.strip():
-                    continue
+            token_count = _count_tokens(enriched)
+            page_label = (
+                f"p{doc_section.page_start}"
+                if doc_section.page_start == doc_section.page_end
+                else f"p{doc_section.page_start}-{doc_section.page_end}"
+            )
+            chunk_id = f"{doc_section.doc_id}_{page_label}_c{idx}"
 
-                # Skip chunks that are below minimum token threshold
-                if _count_tokens(raw_text) < self.min_tokens:
-                    continue
-
-                # Layer 5 — enrich
-                enriched = self._enrich(raw_text, section.breadcrumb)
-
-                token_count = _count_tokens(enriched)
-                chunk_id = f"{page.doc_id}_p{page.page_num}_c{idx}"
-
-                chunks.append(
-                    TextChunk(
-                        chunk_id=chunk_id,
-                        doc_id=page.doc_id,
-                        source=page.source,
-                        page_num=page.page_num,
-                        section_title=section.title,
-                        text=enriched,
-                        chunk_index=idx,
-                        parent_text=parent_text,
-                        breadcrumb=section.breadcrumb,
-                        token_count=token_count,
-                        metadata={
-                            **page.metadata,
-                            "section": section.title,
-                            "breadcrumb": section.breadcrumb,
-                            "level": section.level,
-                            "token_count": token_count,
-                        },
-                    )
+            chunks.append(
+                TextChunk(
+                    chunk_id=chunk_id,
+                    doc_id=doc_section.doc_id,
+                    source=doc_section.source,
+                    page_num=doc_section.page_start,
+                    section_title=section.title,
+                    text=enriched,
+                    chunk_index=idx,
+                    parent_text=parent_text,
+                    breadcrumb=section.breadcrumb,
+                    token_count=token_count,
+                    metadata={
+                        **doc_section.metadata,
+                        "section": section.title,
+                        "breadcrumb": section.breadcrumb,
+                        "level": section.level,
+                        "token_count": token_count,
+                        "page_end": doc_section.page_end,
+                    },
                 )
-                idx += 1
+            )
+            idx += 1
 
         return chunks
 

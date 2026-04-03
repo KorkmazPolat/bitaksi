@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     chunk_overlap_tokens: int = 128      # sliding-window overlap when hard-splitting
     chunk_min_tokens: int = 50           # merge groups smaller than this
     semantic_split_percentile: int = 95  # percentile of cosine-distance for breakpoints
-    use_contextual_enrichment: bool = False  # LLM-generated per-chunk context (slow, opt-in)
+    use_contextual_enrichment: bool = True
+    contextual_enrichment_min_tokens: int = 120
+    contextual_enrichment_max_chars: int = 1200
 
     # Legacy word-based params kept for backward compat
     chunk_size: int = 800
@@ -40,14 +42,21 @@ class Settings(BaseSettings):
     docx_page_paragraph_count: int = 50
     min_chunk_length_for_relatives: int = 50
     chunk_preview_length: int = 1500        # chars sent to relative-question LLM
+    min_relative_question_length: int = 12
+    max_relative_question_length: int = 180
 
     # Generation
     max_history_turns: int = 6
     max_query_length: int = 2000
     max_upload_size_mb: int = 100
+    max_generation_chunks: int = 3
+    max_sources_in_response: int = 3
 
     # Evaluation
     faithfulness_context_limit: int = 4000
+
+    # Retrieval ranking
+    lexical_overlap_weight: float = 0.15
 
     class Config:
         env_file = ".env"

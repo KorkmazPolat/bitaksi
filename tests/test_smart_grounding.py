@@ -133,3 +133,57 @@ def test_deduplication():
 
     chunk_ids = [c.chunk_id for c in result.chunks]
     assert len(chunk_ids) == len(set(chunk_ids))
+
+
+def test_single_strong_chunk_is_now_grounded():
+    raw = _make_retriever([_make_chunk("c1", 0.91)])
+    relatives = _make_retriever([])
+
+    with patch("src.retrieval.smart_grounding.get_settings") as mock_settings:
+        s = MagicMock()
+        s.similarity_threshold = 0.6
+        s.top_k = 5
+        s.fallback_top_k = 8
+        mock_settings.return_value = s
+
+        grounding = SmartGroundingRetriever(raw, relatives)
+        result = grounding.retrieve("tek bir guclu kaynakli soru")
+
+    assert result.strategy_used == RetrievalStrategy.DIRECT
+    assert result.grounded is True
+    assert len(result.chunks) == 1
+
+
+def test_reranking_prefers_lexically_aligned_chunk():
+    raw = _make_retriever([
+        RetrievedChunk(
+            chunk_id="c1",
+            text="Genel yonetim esaslari ve temsil yetkisi.",
+            source="/docs/hr_policy.pdf",
+            page_num=1,
+            section="Genel",
+            score=0.80,
+        ),
+        RetrievedChunk(
+            chunk_id="c2",
+            text="Limited sirketlerde mudurler kurulu sirketin yonetimi ve temsili ile gorevlidir.",
+            source="/docs/hr_policy.pdf",
+            page_num=2,
+            section="Mudurler Kurulu",
+            score=0.75,
+        ),
+    ])
+    relatives = _make_retriever([])
+
+    with patch("src.retrieval.smart_grounding.get_settings") as mock_settings:
+        s = MagicMock()
+        s.similarity_threshold = 0.6
+        s.top_k = 5
+        s.fallback_top_k = 8
+        s.lexical_overlap_weight = 0.3
+        mock_settings.return_value = s
+
+        grounding = SmartGroundingRetriever(raw, relatives)
+        result = grounding.retrieve("mudurler kurulu ne yapar")
+
+    assert result.chunks[0].chunk_id == "c2"

@@ -37,12 +37,14 @@ yanıt ver. Eğer yanıt bağlamda mevcut değilse, bunu açıkça belirt.
 5. Emin olmadığında, çalışanı doğrudan İK departmanıyla iletişime geçmeye yönlendir.
 6. Bağlamda tablo veya rakamlar varsa bunları yanıtına dahil et.
 7. Cevabı **doğrudan ver**; yalnızca "X için [doküman, s.Y]'ye bakınız" tarzı yönlendirme cümlesi yazma.
-8. Her önemli cümlenin sonunda citation kullan (örn. `[İK El Kitabı, s.12]`).
+8. Gereksiz citation tekrarı yapma. Aynı paragrafta aynı kaynağı tekrar tekrar yazma.
+9. Mümkünse cevabı 1-2 kısa paragraf veya en fazla 3 madde ile ver.
+10. Toplam citation sayısını düşük tut; genelde 1-3 citation yeterlidir.
 
 ## Yanıt Formatı
 - Kısa bir doğrudan cevap
 - Gerekirse madde işaretleri
-- Her maddede/cümlede kaynak citation
+- Gerekli yerlerde kaynak citation
 - Eğer bilgi eksikse, eksik olan kısmı açıkça belirt
 
 ## YASAK
@@ -58,7 +60,7 @@ Yanıtı yeniden yaz.
 Kurallar:
 1. Kullanıcı sorusuna doğrudan cevap ver.
 2. "bakınız", "detay için şu sayfaya bakın" gibi referansa yönlendiren tek cümle formatı kullanma.
-3. Her önemli cümlenin sonuna citation ekle: [Doküman, s.X]
+3. Sadece gerekli yerlerde citation ekle; aynı kaynağı gereksiz tekrar etme.
 4. Bağlamda olmayan bilgi ekleme.
 
 Kullanıcı sorusu:
@@ -72,8 +74,8 @@ Mevcut yetersiz yanıt:
 """
 
 NO_CONTEXT_MSG = """\
-Üzgünüm, bu soruyu yanıtlamak için ilgili bir İK dokümanı bulunamadı. \
-Lütfen sorunuzu farklı şekilde ifade etmeyi deneyin veya \
+Üzgünüm, bu soruyu güvenle yanıtlayacak kadar ilgili kaynak bulunamadı. \
+Lütfen sorunuzu daha açık veya farklı şekilde ifade etmeyi deneyin ya da \
 doğrudan **İK departmanıyla** iletişime geçin.
 """
 
@@ -106,6 +108,8 @@ class ResponseGenerator:
         settings = get_settings()
         self.model = settings.llm_model
         self.max_history_turns = settings.max_history_turns
+        self.max_generation_chunks = settings.max_generation_chunks
+        self.max_sources_in_response = settings.max_sources_in_response
 
     def generate(
         self,
@@ -123,8 +127,9 @@ class ResponseGenerator:
                 queries_tried=retrieval_result.queries_tried,
             )
 
-        context_block = self._format_context(retrieval_result.chunks)
-        sources = self._extract_sources(retrieval_result.chunks)
+        selected_chunks = self._select_generation_chunks(retrieval_result.chunks)
+        context_block = self._format_context(selected_chunks)
+        sources = self._extract_sources(selected_chunks)
         messages = self._build_messages(query, context_block, history or [])
 
         response = llm_call(
@@ -133,7 +138,7 @@ class ResponseGenerator:
             system=SYSTEM_PROMPT,
             messages=messages,
         )
-        answer = response.strip()
+        answer = self._coerce_text_response(response).strip()
 
         if self._needs_rewrite(answer):
             rewrite = llm_call(
@@ -151,7 +156,7 @@ class ResponseGenerator:
                     }
                 ],
             )
-            answer = rewrite.strip() or answer
+            answer = self._coerce_text_response(rewrite).strip() or answer
 
         return GenerationResult(
             answer=answer,
@@ -162,6 +167,20 @@ class ResponseGenerator:
         )
 
     # ------------------------------------------------------------------
+
+    def _select_generation_chunks(self, chunks) -> list:
+        """Keep generation context tight to reduce noisy or repetitive citations."""
+        seen: set[tuple[str, int, str]] = set()
+        selected: list = []
+        for chunk in sorted(chunks, key=lambda c: c.score, reverse=True):
+            key = (chunk.source, chunk.page_num, chunk.section)
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(chunk)
+            if len(selected) >= self.max_generation_chunks:
+                break
+        return selected or list(chunks[: self.max_generation_chunks])
 
     @staticmethod
     def _format_context(chunks) -> str:
@@ -174,8 +193,7 @@ class ResponseGenerator:
             )
         return "\n\n---\n\n".join(parts)
 
-    @staticmethod
-    def _extract_sources(chunks) -> list[dict]:
+    def _extract_sources(self, chunks) -> list[dict]:
         seen: set[str] = set()
         sources: list[dict] = []
         for chunk in chunks:
@@ -192,7 +210,9 @@ class ResponseGenerator:
                         "chunk_text": chunk.text,   # used by frontend for highlighting
                     }
                 )
-        return sorted(sources, key=lambda s: s["score"], reverse=True)
+        return sorted(
+            sources, key=lambda s: s["score"], reverse=True
+        )[: self.max_sources_in_response]
 
     def _build_messages(
         self,
@@ -212,6 +232,17 @@ class ResponseGenerator:
             ),
         })
         return messages
+
+    @staticmethod
+    def _coerce_text_response(response) -> str:
+        if isinstance(response, str):
+            return response
+        content = getattr(response, "content", None)
+        if isinstance(content, list) and content:
+            text = getattr(content[0], "text", None)
+            if isinstance(text, str):
+                return text
+        return str(response or "")
 
     @staticmethod
     def _needs_rewrite(answer: str) -> bool:
