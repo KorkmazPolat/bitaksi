@@ -11,6 +11,9 @@ from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunct
 
 from src.config import get_settings
 from src.generation.response_generator import GenerationResult, ResponseGenerator
+from src.retrieval.bm25_retriever import BM25Retriever
+from src.retrieval.hybrid_retriever import HybridRetriever
+from src.retrieval.reranker import CrossEncoderReranker
 from src.retrieval.retriever import BaseRetriever
 from src.retrieval.smart_grounding import SmartGroundingRetriever
 
@@ -60,11 +63,21 @@ def _build_service() -> ChatService:
         metadata={"hnsw:space": "cosine"},
     )
 
-    raw_retriever = BaseRetriever(
+    # ── Retrieval stack ───────────────────────────────────────────────
+    dense_retriever = BaseRetriever(
         collection=raw_col,
         top_k=settings.top_k,
         score_threshold=settings.similarity_threshold,
     )
+    bm25_retriever = BM25Retriever(raw_collection=raw_col)
+    reranker = CrossEncoderReranker()
+
+    hybrid_retriever = HybridRetriever(
+        dense_retriever=dense_retriever,
+        bm25_retriever=bm25_retriever,
+        reranker=reranker,
+    )
+
     relatives_retriever = BaseRetriever(
         collection=relatives_col,
         top_k=settings.top_k,
@@ -72,7 +85,7 @@ def _build_service() -> ChatService:
     )
 
     grounding = SmartGroundingRetriever(
-        raw_retriever=raw_retriever,
+        hybrid_retriever=hybrid_retriever,
         relatives_retriever=relatives_retriever,
     )
     generator = ResponseGenerator()

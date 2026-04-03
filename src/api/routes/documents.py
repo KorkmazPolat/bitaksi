@@ -103,6 +103,15 @@ async def ingest_document(file: UploadFile = File(...)):
     try:
         indexer = DocumentIndexer()
         stats = indexer.ingest_file(str(stored_path))
+
+        # Rebuild BM25 index so new document is searchable immediately
+        try:
+            from src.api.dependencies import get_chat_service
+            get_chat_service().grounding.hybrid.invalidate_bm25()
+        except Exception as exc:  # pragma: no cover
+            import logging
+            logging.getLogger(__name__).warning("BM25 rebuild skipped: %s", exc)
+
         return IngestResponse(**stats, status="success")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

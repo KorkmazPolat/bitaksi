@@ -187,9 +187,13 @@ class ResponseGenerator:
         parts: list[str] = []
         for i, chunk in enumerate(chunks, start=1):
             doc_name = Path(chunk.source).stem if chunk.source else _UNKNOWN_DOC
+            section_label = chunk.breadcrumb or chunk.section
+            # Use full parent section for richer LLM context;
+            # child chunk text is preserved in sources for UI highlighting
+            context_text = chunk.parent_text if chunk.parent_text else chunk.text
             parts.append(
-                f"[Kaynak {i}: {doc_name} | Bölüm: {chunk.section} | Sayfa: {chunk.page_num}]\n"
-                f"{chunk.text}"
+                f"[Kaynak {i}: {doc_name} | Bölüm: {section_label} | Sayfa: {chunk.page_num}]\n"
+                f"{context_text}"
             )
         return "\n\n---\n\n".join(parts)
 

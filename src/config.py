@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     relatives_score_threshold: float = 0.5   # lower bar for Q→chunk matching
     fallback_top_k: int = 8
 
+    # Hybrid retrieval
+    use_bm25: bool = True
+    use_reranking: bool = True
+    rerank_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    rerank_candidate_k: int = 20   # candidates fed to cross-encoder
+    rerank_final_k: int = 5        # output after reranking
+    rrf_k: int = 60                # RRF constant (standard value)
+
     # Chunking — hierarchical semantic chunker
     chunk_max_tokens: int = 512          # child chunk ceiling (tokens)
     chunk_overlap_tokens: int = 128      # sliding-window overlap when hard-splitting

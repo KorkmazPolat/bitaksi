@@ -12,13 +12,15 @@ from src.utils.enums import ContentType
 @dataclass
 class RetrievedChunk:
     chunk_id: str
-    text: str
+    text: str               # child chunk text (used for retrieval + UI highlighting)
     source: str
     page_num: int
     section: str
-    score: float           # cosine similarity (0–1, higher = better)
+    score: float            # final score after reranking (higher = better)
     doc_id: str = ""
     content_type: str = ContentType.TEXT
+    parent_text: str = ""   # full section text — richer context for LLM generation
+    breadcrumb: str = ""    # section hierarchy path
 
     @classmethod
     def from_metadata(
@@ -38,6 +40,8 @@ class RetrievedChunk:
             score=score,
             doc_id=meta.get("doc_id", ""),
             content_type=meta.get("content_type", ContentType.TEXT),
+            parent_text=meta.get("parent_text", ""),
+            breadcrumb=meta.get("breadcrumb", ""),
         )
 
 
