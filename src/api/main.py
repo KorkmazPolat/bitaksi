@@ -1,11 +1,12 @@
 """
 HR Assistant Chatbot — FastAPI application entry point.
 """
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
 from src.api.routes import chat, documents, evaluation, health
 
@@ -25,13 +26,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve rendered PDF page images at /pages/{doc_id}/page_{n}.png
+_pages_dir = Path("data/pages")
+_pages_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/pages", StaticFiles(directory=str(_pages_dir)), name="pages")
+
+# Serve the chat UI from src/api/static/
+_static_dir = Path(__file__).parent / "static"
+_static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def serve_chat_ui():
+    """Serve the split-panel chat UI at the root URL."""
+    return FileResponse(str(_static_dir / "index.html"))
+
+
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(evaluation.router)
-
-UI_DIR = Path(__file__).parent.parent.parent / "ui"
-
-@app.get("/ui", include_in_schema=False)
-def serve_ui():
-    return FileResponse(UI_DIR / "index.html")

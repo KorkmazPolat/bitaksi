@@ -1,24 +1,26 @@
 """
 Document processor: parses PDF and DOCX files into structured pages.
 Each page carries its raw text plus base64-encoded image for vision LLM.
+Page images are also persisted to data/pages/{doc_id}/page_{n}.png so
+the document viewer can serve them without re-rendering.
 """
 from __future__ import annotations
 
 import base64
 import io
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-import logging
-
 import pdfplumber
 from docx import Document as DocxDocument
-from PIL import Image
 
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+PAGES_DIR = Path("data/pages")
 
 
 @dataclass
@@ -62,8 +64,9 @@ class DocumentProcessor:
                 text = page.extract_text() or ""
                 tables = page.extract_tables() or []
 
-                # Render page to image for vision LLM
-                image_b64 = self._render_pdf_page_to_b64(page)
+                # Render page to image — persist to disk AND keep in memory for vision
+                save_path = PAGES_DIR / doc_id / f"page_{page_num}.png"
+                image_b64 = self._render_pdf_page_to_b64(page, save_path=save_path)
 
                 pages.append(
                     DocumentPage(
@@ -79,12 +82,16 @@ class DocumentProcessor:
         return pages
 
     @staticmethod
-    def _render_pdf_page_to_b64(page) -> Optional[str]:
+    def _render_pdf_page_to_b64(page, save_path: Optional[Path] = None) -> Optional[str]:
         try:
             img = page.to_image(resolution=150).original
             buf = io.BytesIO()
             img.save(buf, format="PNG")
-            return base64.b64encode(buf.getvalue()).decode("utf-8")
+            png_bytes = buf.getvalue()
+            if save_path:
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                save_path.write_bytes(png_bytes)
+            return base64.b64encode(png_bytes).decode("utf-8")
         except Exception as exc:
             logger.warning("PDF page render failed: %s", exc)
             return None

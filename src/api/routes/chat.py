@@ -36,6 +36,7 @@ class SourceRef(BaseModel):
     page: int
     section: str
     score: float
+    chunk_text: str = ""   # sent to frontend for text highlighting
 
 
 class ChatResponse(BaseModel):

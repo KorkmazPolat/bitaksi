@@ -143,6 +143,7 @@ class ResponseGenerator:
                         "page": chunk.page_num,
                         "section": chunk.section,
                         "score": round(chunk.score, 3),
+                        "chunk_text": chunk.text,   # used by frontend for highlighting
                     }
                 )
         return sorted(sources, key=lambda s: s["score"], reverse=True)
