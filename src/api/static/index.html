@@ -505,6 +505,7 @@
             ...entry,
             source_index: citations[index]?.source_index ?? -1,
             evidence_text: citations[index]?.evidence_text || "",
+            answer_text: cleanAnswerText(entry.context || ""),
           }))
         : [];
       div.innerHTML = role === "bot"
@@ -541,6 +542,7 @@
       wrap.appendChild(div);
 
       if (role === "bot") {
+        lastCitations = citationEntries;
         div.querySelectorAll(".inline-cite").forEach((btn) => {
           btn.addEventListener("click", async () => {
             const citationIndex = Number(btn.getAttribute("data-cite-index") || "-1");
@@ -552,6 +554,27 @@
       }
 
       wrap.scrollTop = wrap.scrollHeight;
+    }
+
+    function cleanAnswerText(text) {
+      return (text || "")
+        .replace(/\[[^\]]+\]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function uniqueNonEmpty(values) {
+      const out = [];
+      const seen = new Set();
+      (values || []).forEach((value) => {
+        const normalized = cleanAnswerText(value);
+        if (!normalized) return;
+        const key = normalized.toLocaleLowerCase("tr-TR");
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(normalized);
+      });
+      return out;
     }
 
     function renderBotTextWithCitations(text, citations = []) {
@@ -655,14 +678,10 @@
       return { normalized, indexMap };
     }
 
-    function markExactAnswerSpan(textLayer, snippetText) {
-      const target = normalizeWithMap(snippetText || "").normalized;
-      if (!target) return false;
-
+    function buildCombinedSpanMap(textLayer) {
       const spans = Array.from(textLayer.querySelectorAll("span"));
       const combinedParts = [];
       const charToSpan = [];
-
       spans.forEach((sp, spanIndex) => {
         const { normalized } = normalizeWithMap(sp.textContent || "");
         if (!normalized) return;
@@ -678,8 +697,15 @@
         combinedParts.pop();
         charToSpan.pop();
       }
+      return { spans, combined: combinedParts.join(""), charToSpan };
+    }
 
-      const combined = combinedParts.join("");
+    function markExactAnswerSpan(textLayer, snippetText) {
+      const target = normalizeWithMap(snippetText || "").normalized;
+      if (!target) return false;
+
+      const { spans, combined, charToSpan } = buildCombinedSpanMap(textLayer);
+
       const start = combined.indexOf(target);
       if (start === -1) return false;
 
@@ -746,6 +772,17 @@
         spans[spanData[i].index]?.classList.add("matched");
       }
       return true;
+    }
+
+    function markHighlightCandidates(textLayer, candidates) {
+      const items = uniqueNonEmpty(candidates);
+      for (const candidate of items) {
+        if (markExactAnswerSpan(textLayer, candidate)) return true;
+      }
+      for (const candidate of items) {
+        if (markApproximateAnswerSpan(textLayer, candidate)) return true;
+      }
+      return false;
     }
 
     async function resolveBestPage(source) {
@@ -825,11 +862,10 @@
         textDivs,
       }).promise;
 
-      const highlightText = source.highlight_text || source.chunk_text || "";
-      const matched = markExactAnswerSpan(textLayer, highlightText);
-      if (!matched) {
-        markApproximateAnswerSpan(textLayer, highlightText);
-      }
+      markHighlightCandidates(
+        textLayer,
+        source.highlight_candidates || [source.highlight_text || source.chunk_text || ""]
+      );
     }
 
     async function showFallback(source, pageToOpen) {
@@ -841,7 +877,10 @@
       canvas.height = 0;
       textLayer.innerHTML = "";
 
-      const chunkParam = encodeURIComponent(source.highlight_text || source.chunk_text || "");
+      const firstHighlight = uniqueNonEmpty(
+        source.highlight_candidates || [source.highlight_text || source.chunk_text || ""]
+      )[0] || "";
+      const chunkParam = encodeURIComponent(firstHighlight);
       const pageUrl = `${API}/documents/${encodeURIComponent(source.document)}/page/${pageToOpen}?chunk_text=${chunkParam}`;
       const res = await fetch(pageUrl);
       const data = await res.json();
@@ -884,12 +923,23 @@
       return best;
     }
 
+    function findCitationForSourceIndex(sourceIndex) {
+      return (lastCitations || []).find((citation) => citation.source_index === sourceIndex) || null;
+    }
+
     async function showCitationOnDocument(citation, sources = []) {
       const source = findBestSourceForCitation(citation, sources);
       if (source) {
         const citationSource = {
           ...source,
-          highlight_text: citation.evidence_text || source.highlight_text || source.chunk_text || "",
+          highlight_candidates: uniqueNonEmpty([
+            citation.answer_text,
+            citation.context,
+            citation.evidence_text,
+            source.highlight_text,
+            source.chunk_text,
+          ]),
+          highlight_text: citation.answer_text || citation.evidence_text || source.highlight_text || source.chunk_text || "",
         };
         openDrawer();
         const pageToOpen = await resolveBestPage(citationSource);
@@ -922,13 +972,25 @@
     async function showAnswerOnDocument(idx) {
       const source = lastSources[idx];
       if (!source) return;
+      const citation = findCitationForSourceIndex(idx);
+      const answerSource = {
+        ...source,
+        highlight_candidates: uniqueNonEmpty([
+          citation?.answer_text,
+          citation?.context,
+          citation?.evidence_text,
+          source.highlight_text,
+          source.chunk_text,
+        ]),
+        highlight_text: citation?.answer_text || citation?.evidence_text || source.highlight_text || source.chunk_text || "",
+      };
       openDrawer();
-      const pageToOpen = await resolveBestPage(source);
+      const pageToOpen = await resolveBestPage(answerSource);
 
       try {
-        await renderPdfWithHighlight(source, pageToOpen);
+        await renderPdfWithHighlight(answerSource, pageToOpen);
       } catch {
-        await showFallback(source, pageToOpen);
+        await showFallback(answerSource, pageToOpen);
       }
     }
 

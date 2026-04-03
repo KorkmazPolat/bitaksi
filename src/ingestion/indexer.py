@@ -41,6 +41,7 @@ Kurallar:
 - Sadece bu chunk'in cevaplayabilecegi sorular yaz.
 - Cok genel veya anlamsiz sorular yazma.
 - Her soruda mumkunse dokumandaki ana terimi koru.
+- Toplamda 6-8 ana soru ve 2-3 follow-up soru uretmeye calis.
 
 Dokuman chunk:
 \"\"\"
@@ -225,6 +226,12 @@ class DocumentIndexer:
                 data.get("questions", []) + data.get("follow_ups", []),
                 chunk=chunk,
             )
+            if len(candidates) < 6:
+                candidates = self._merge_relative_candidates(
+                    candidates,
+                    self._fallback_relative_candidates(chunk),
+                    limit=8,
+                )
             for q in candidates:
                 q_id = "q_" + hashlib.md5(
                     f"{chunk.chunk_id}:{q}".encode()
@@ -289,7 +296,7 @@ class DocumentIndexer:
                 "bu konu nedir?",
             }:
                 continue
-            if len(q.split()) < 4:
+            if len(q.split()) < 3:
                 continue
             if not self._looks_like_complete_question(q):
                 continue
@@ -301,7 +308,44 @@ class DocumentIndexer:
             seen.add(q)
             filtered.append(q)
 
-        return filtered[:5]
+        return filtered[:8]
+
+    def _fallback_relative_candidates(self, chunk: TextChunk) -> list[str]:
+        section = " ".join(str(chunk.section_title or "").split())
+        raw_text = " ".join((chunk.text or "").replace("\n", " ").split())
+        snippet = re.sub(r"\[[^\]]+\]", "", raw_text).strip()
+        snippet = snippet[:220].rstrip(" ,;:-")
+
+        seeds = [
+            f"{section} kapsaminda hangi kurallar gecerlidir?" if section else "",
+            f"{section} ile ilgili temel haklar nelerdir?" if section else "",
+            f"{section} sureci nasil isler?" if section else "",
+            f"{section} icin hangi kosullar aranir?" if section else "",
+            f"{section} durumunda hangi adimlar izlenmelidir?" if section else "",
+            f"{section} hakkinda calisanlar en cok hangi konuyu merak eder?" if section else "",
+            f"Bu bolumde aciklanan uygulama nasil calisir?" if snippet else "",
+            f"Bu metindeki kurallar hangi durumlarda uygulanir?" if snippet else "",
+        ]
+
+        return self._filter_relative_candidates([q for q in seeds if q], chunk=chunk)
+
+    @staticmethod
+    def _merge_relative_candidates(
+        primary: list[str],
+        secondary: list[str],
+        *,
+        limit: int,
+    ) -> list[str]:
+        merged: list[str] = []
+        seen: set[str] = set()
+        for question in list(primary) + list(secondary):
+            if not question or question in seen:
+                continue
+            seen.add(question)
+            merged.append(question)
+            if len(merged) >= limit:
+                break
+        return merged
 
     @staticmethod
     def _normalize_relative_question(raw: str) -> str:
