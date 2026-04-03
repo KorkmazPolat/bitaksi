@@ -6,6 +6,7 @@ __pycache__/
 .ruff_cache/
 data/chroma/
 data/documents/
+data/pages/
 *.egg-info/
 dist/
 build/
