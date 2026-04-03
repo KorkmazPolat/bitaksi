@@ -80,22 +80,27 @@
 
     .layout {
       height: 100%;
+      min-height: 0;
       padding: 14px;
       min-width: 0;
-      display: block;
+      display: flex;
+      flex-direction: column;
     }
 
     .card {
+      flex: 1;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius);
       min-height: 0;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     #messages {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
       padding: 14px;
       display: flex;
@@ -363,6 +368,7 @@
     const API = "";
     let history = [];
     let lastSources = [];
+    let lastCitations = [];
     const chunkPageCache = new Map();
 
     if (window.pdfjsLib) {
@@ -414,6 +420,60 @@
       return cited;
     }
 
+    function tokenizeForOverlap(text) {
+      return Array.from(new Set(
+        ((text || "").toLocaleLowerCase("tr-TR").match(/\p{L}[\p{L}\p{N}]*/gu) || [])
+          .filter((token) => token.length >= 3)
+      ));
+    }
+
+    function overlapScore(a, b) {
+      const aTokens = tokenizeForOverlap(a);
+      const bTokens = new Set(tokenizeForOverlap(b));
+      if (!aTokens.length || !bTokens.size) return 0;
+      let overlap = 0;
+      aTokens.forEach((token) => {
+        if (bTokens.has(token)) overlap += 1;
+      });
+      return overlap / aTokens.length;
+    }
+
+    function extractCitationEntries(text) {
+      const raw = text || "";
+      const re = /\[([^,\]]+),\s*s\.(\d+)\]/g;
+      const entries = [];
+      let match;
+
+      while ((match = re.exec(raw)) !== null) {
+        const doc = (match[1] || "").trim();
+        const page = Number(match[2] || "1");
+        const start = match.index;
+        const end = re.lastIndex;
+        const sentenceStart = Math.max(
+          raw.lastIndexOf(".", start - 1),
+          raw.lastIndexOf("!", start - 1),
+          raw.lastIndexOf("?", start - 1),
+          raw.lastIndexOf("\n", start - 1),
+        );
+        const sentenceEndCandidates = [
+          raw.indexOf(".", end),
+          raw.indexOf("!", end),
+          raw.indexOf("?", end),
+          raw.indexOf("\n", end),
+        ].filter((idx) => idx !== -1);
+        const sentenceEnd = sentenceEndCandidates.length ? Math.min(...sentenceEndCandidates) : raw.length;
+        entries.push({
+          index: entries.length,
+          doc,
+          page,
+          rawText: match[0],
+          context: raw.slice(sentenceStart + 1, sentenceEnd).trim(),
+        });
+      }
+
+      return entries;
+    }
+
     function buildSourcesBlock(label, items, onClickFactory) {
       const block = document.createElement("div");
       block.className = "sources-block";
@@ -436,11 +496,20 @@
       return block;
     }
 
-    function addMessage(role, text, sources = []) {
+    function addMessage(role, text, sources = [], citations = []) {
       const wrap = document.getElementById("messages");
       const div = document.createElement("div");
       div.className = `msg ${role}`;
-      div.innerHTML = role === "bot" ? renderBotTextWithCitations(text) : escapeHtml(text).replace(/\n/g, "<br>");
+      const citationEntries = role === "bot"
+        ? extractCitationEntries(text).map((entry, index) => ({
+            ...entry,
+            source_index: citations[index]?.source_index ?? -1,
+            evidence_text: citations[index]?.evidence_text || "",
+          }))
+        : [];
+      div.innerHTML = role === "bot"
+        ? renderBotTextWithCitations(text, citationEntries)
+        : escapeHtml(text).replace(/\n/g, "<br>");
 
       if (sources.length) {
         const citedPages = extractCitedPages(text);
@@ -474,9 +543,10 @@
       if (role === "bot") {
         div.querySelectorAll(".inline-cite").forEach((btn) => {
           btn.addEventListener("click", async () => {
-            const doc = decodeURIComponent(btn.getAttribute("data-doc") || "");
-            const page = Number(btn.getAttribute("data-page") || "1");
-            await showCitationOnDocument(doc, page);
+            const citationIndex = Number(btn.getAttribute("data-cite-index") || "-1");
+            const citation = citationEntries[citationIndex];
+            if (!citation) return;
+            await showCitationOnDocument(citation, sources);
           });
         });
       }
@@ -484,22 +554,25 @@
       wrap.scrollTop = wrap.scrollHeight;
     }
 
-    function renderBotTextWithCitations(text) {
+    function renderBotTextWithCitations(text, citations = []) {
       const raw = text || "";
       const re = /\[([^,\]]+),\s*s\.(\d+)\]/g;
       let out = "";
       let last = 0;
       let m;
+      let citationIndex = 0;
 
       while ((m = re.exec(raw)) !== null) {
         const before = raw.slice(last, m.index);
         const doc = (m[1] || "").trim();
         const page = Number(m[2] || "1");
         const docAttr = encodeURIComponent(doc);
+        const citeIndexAttr = citationIndex;
 
         out += escapeHtml(before).replace(/\n/g, "<br>");
-        out += `<button class="inline-cite" data-doc="${docAttr}" data-page="${page}">[${escapeHtml(doc)}, s.${page}]</button>`;
+        out += `<button class="inline-cite" data-doc="${docAttr}" data-page="${page}" data-cite-index="${citeIndexAttr}">[${escapeHtml(doc)}, s.${page}]</button>`;
         last = re.lastIndex;
+        citationIndex += 1;
       }
 
       out += escapeHtml(raw.slice(last)).replace(/\n/g, "<br>");
@@ -526,13 +599,15 @@
         const data = await res.json();
         const answer = data.answer || "Yanit alinamadi.";
         const sources = data.sources || [];
+        const citations = data.citations || [];
 
         history.push({ role: "user", content: query });
         history.push({ role: "assistant", content: answer });
         if (history.length > 20) history = history.slice(-20);
 
         lastSources = sources;
-        addMessage("bot", answer, sources);
+        lastCitations = citations;
+        addMessage("bot", answer, sources, citations);
         if (sources.length) {
           showAnswerOnDocument(0);
         }
@@ -543,35 +618,134 @@
       }
     }
 
-    function buildTokenSet(chunkText) {
-      const words = (chunkText || "")
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}\s]/gu, " ")
-        .split(/\s+/)
-        .filter(w => w.length >= 4);
-      return Array.from(new Set(words)).slice(0, 60);
+    function normalizeWithMap(text) {
+      let normalized = "";
+      const indexMap = [];
+      let previousWasSpace = false;
+
+      for (let i = 0; i < (text || "").length; i += 1) {
+        const ch = text[i];
+        const lower = ch.toLocaleLowerCase("tr-TR");
+        if (/[\p{L}\p{N}]/u.test(lower)) {
+          normalized += lower;
+          indexMap.push(i);
+          previousWasSpace = false;
+          continue;
+        }
+        if (/\s/u.test(lower) || /[-_/.,:;!?()[\]{}'""]/u.test(lower)) {
+          if (normalized && !previousWasSpace) {
+            normalized += " ";
+            indexMap.push(i);
+          }
+          previousWasSpace = true;
+          continue;
+        }
+        if (normalized && !previousWasSpace) {
+          normalized += " ";
+          indexMap.push(i);
+        }
+        previousWasSpace = true;
+      }
+
+      if (normalized.endsWith(" ")) {
+        normalized = normalized.slice(0, -1);
+        indexMap.pop();
+      }
+
+      return { normalized, indexMap };
     }
 
-    function markLikelyAnswerSpans(textLayer, chunkText) {
-      const tokens = buildTokenSet(chunkText);
-      if (!tokens.length) return;
+    function markExactAnswerSpan(textLayer, snippetText) {
+      const target = normalizeWithMap(snippetText || "").normalized;
+      if (!target) return false;
 
-      const spans = textLayer.querySelectorAll("span");
-      spans.forEach((sp) => {
-        const t = (sp.textContent || "").toLowerCase();
-        if (!t) return;
+      const spans = Array.from(textLayer.querySelectorAll("span"));
+      const combinedParts = [];
+      const charToSpan = [];
 
-        let hits = 0;
-        for (const tok of tokens) {
-          if (t.includes(tok)) {
-            hits += 1;
-            if (hits >= 1) break;
+      spans.forEach((sp, spanIndex) => {
+        const { normalized } = normalizeWithMap(sp.textContent || "");
+        if (!normalized) return;
+        for (const ch of normalized) {
+          combinedParts.push(ch);
+          charToSpan.push(spanIndex);
+        }
+        combinedParts.push(" ");
+        charToSpan.push(spanIndex);
+      });
+
+      while (combinedParts.length && combinedParts[combinedParts.length - 1] === " ") {
+        combinedParts.pop();
+        charToSpan.pop();
+      }
+
+      const combined = combinedParts.join("");
+      const start = combined.indexOf(target);
+      if (start === -1) return false;
+
+      const end = start + target.length - 1;
+      const matchedSpanIndexes = new Set();
+      for (let i = start; i <= end; i += 1) {
+        const spanIndex = charToSpan[i];
+        if (spanIndex !== undefined) {
+          matchedSpanIndexes.add(spanIndex);
+        }
+      }
+
+      matchedSpanIndexes.forEach((idx) => spans[idx]?.classList.add("matched"));
+      return matchedSpanIndexes.size > 0;
+    }
+
+    function markApproximateAnswerSpan(textLayer, snippetText) {
+      const targetTokens = tokenizeForOverlap(snippetText || "");
+      if (!targetTokens.length) return false;
+
+      const spans = Array.from(textLayer.querySelectorAll("span"));
+      const spanData = spans.map((sp, index) => {
+        const rawText = sp.textContent || "";
+        const normalized = normalizeWithMap(rawText).normalized;
+        const tokens = tokenizeForOverlap(rawText);
+        return { index, normalized, tokens };
+      }).filter((item) => item.normalized);
+
+      if (!spanData.length) return false;
+
+      const targetSet = new Set(targetTokens);
+      let best = null;
+      let bestScore = 0;
+      const maxWindow = Math.min(14, spanData.length);
+
+      for (let start = 0; start < spanData.length; start += 1) {
+        const windowTokens = new Set();
+
+        for (let width = 1; width <= maxWindow && start + width <= spanData.length; width += 1) {
+          const item = spanData[start + width - 1];
+          item.tokens.forEach((token) => windowTokens.add(token));
+          if (!windowTokens.size) continue;
+
+          let overlap = 0;
+          targetSet.forEach((token) => {
+            if (windowTokens.has(token)) overlap += 1;
+          });
+          if (!overlap) continue;
+
+          const recall = overlap / targetSet.size;
+          const precision = overlap / windowTokens.size;
+          const score = (recall * 0.8) + (precision * 0.2);
+
+          if (score > bestScore) {
+            bestScore = score;
+            best = { start, end: start + width - 1 };
           }
         }
-        if (hits > 0) {
-          sp.classList.add("matched");
-        }
-      });
+      }
+
+      if (!best || bestScore < 0.42) return false;
+
+      for (let i = best.start; i <= best.end; i += 1) {
+        spans[spanData[i].index]?.classList.add("matched");
+      }
+      return true;
     }
 
     async function resolveBestPage(source) {
@@ -651,7 +825,11 @@
         textDivs,
       }).promise;
 
-      markLikelyAnswerSpans(textLayer, source.chunk_text || "");
+      const highlightText = source.highlight_text || source.chunk_text || "";
+      const matched = markExactAnswerSpan(textLayer, highlightText);
+      if (!matched) {
+        markApproximateAnswerSpan(textLayer, highlightText);
+      }
     }
 
     async function showFallback(source, pageToOpen) {
@@ -663,7 +841,7 @@
       canvas.height = 0;
       textLayer.innerHTML = "";
 
-      const chunkParam = encodeURIComponent(source.chunk_text || "");
+      const chunkParam = encodeURIComponent(source.highlight_text || source.chunk_text || "");
       const pageUrl = `${API}/documents/${encodeURIComponent(source.document)}/page/${pageToOpen}?chunk_text=${chunkParam}`;
       const res = await fetch(pageUrl);
       const data = await res.json();
@@ -677,20 +855,67 @@
       `;
     }
 
-    async function showCitationOnDocument(docId, page) {
+    function findBestSourceForCitation(citation, sources) {
+      if (Number.isInteger(citation?.source_index) && citation.source_index >= 0) {
+        return sources[citation.source_index] || null;
+      }
+      const docKey = String(citation.doc || "").trim().toLocaleLowerCase("tr-TR");
+      const page = Number(citation.page) || 1;
+      const candidates = (sources || []).filter((source) => {
+        return (
+          String(source.document || "").trim().toLocaleLowerCase("tr-TR") === docKey &&
+          (Number(source.page) || 1) === page
+        );
+      });
+
+      if (!candidates.length) return null;
+      if (candidates.length === 1) return candidates[0];
+
+      let best = candidates[0];
+      let bestScore = -1;
+      candidates.forEach((source) => {
+        const snippet = source.highlight_text || source.chunk_text || "";
+        const score = overlapScore(citation.context, snippet);
+        if (score > bestScore) {
+          best = source;
+          bestScore = score;
+        }
+      });
+      return best;
+    }
+
+    async function showCitationOnDocument(citation, sources = []) {
+      const source = findBestSourceForCitation(citation, sources);
+      if (source) {
+        const citationSource = {
+          ...source,
+          highlight_text: citation.evidence_text || source.highlight_text || source.chunk_text || "",
+        };
+        openDrawer();
+        const pageToOpen = await resolveBestPage(citationSource);
+        try {
+          await renderPdfWithHighlight(citationSource, pageToOpen);
+        } catch {
+          await showFallback(citationSource, pageToOpen);
+        }
+        return;
+      }
+
+      const docId = citation?.doc || "";
+      const page = Number(citation?.page) || 1;
       if (!docId) return;
       openDrawer();
-      const source = {
+      const fallbackSource = {
         document: docId,
-        page: Number(page) || 1,
+        page,
         section: "Alinti",
         chunk_text: "",
       };
 
       try {
-        await renderPdfWithHighlight(source, source.page);
+        await renderPdfWithHighlight(fallbackSource, fallbackSource.page);
       } catch {
-        await showFallback(source, source.page);
+        await showFallback(fallbackSource, fallbackSource.page);
       }
     }
 

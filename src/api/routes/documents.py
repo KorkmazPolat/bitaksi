@@ -361,27 +361,66 @@ def _escape(text: str) -> str:
     )
 
 
+def _normalize_with_map(text: str) -> tuple[str, list[int]]:
+    normalized_chars: list[str] = []
+    index_map: list[int] = []
+    previous_was_space = False
+
+    for idx, ch in enumerate(text):
+        lowered = ch.lower()
+        if lowered.isalnum():
+            normalized_chars.append(lowered)
+            index_map.append(idx)
+            previous_was_space = False
+            continue
+
+        if lowered.isspace() or lowered in "-_/.,:;!?()[]{}'\"":
+            if normalized_chars and not previous_was_space:
+                normalized_chars.append(" ")
+                index_map.append(idx)
+            previous_was_space = True
+            continue
+
+        if normalized_chars and not previous_was_space:
+            normalized_chars.append(" ")
+            index_map.append(idx)
+        previous_was_space = True
+
+    if normalized_chars and normalized_chars[-1] == " ":
+        normalized_chars.pop()
+        index_map.pop()
+
+    return "".join(normalized_chars), index_map
+
+
 def _highlight_chunk(page_text: str, chunk_text: str) -> str:
     """
     Wrap the first occurrence of chunk_text inside page_text with <mark>.
     Falls back to a fuzzy match using the first 60 chars of the chunk.
     """
     escaped_page = _escape(page_text)
-    escaped_chunk = _escape(chunk_text)
+    if not chunk_text.strip():
+        return escaped_page
 
-    # Try exact match first (on escaped strings so markup is consistent)
-    if escaped_chunk and escaped_chunk in escaped_page:
-        return escaped_page.replace(escaped_chunk, f'<mark class="hl">{escaped_chunk}</mark>', 1)
+    normalized_page, page_map = _normalize_with_map(page_text)
+    normalized_chunk, _ = _normalize_with_map(chunk_text)
+    if not normalized_page or not normalized_chunk:
+        return escaped_page
 
-    # Fuzzy: try matching the first ~60 characters of the chunk
-    snippet = _escape(chunk_text[:60].strip())
-    if snippet and snippet in escaped_page:
-        idx = escaped_page.index(snippet)
-        end = min(idx + len(escaped_chunk), len(escaped_page))
-        return (
-            escaped_page[:idx]
-            + f'<mark class="hl">{escaped_page[idx:end]}</mark>'
-            + escaped_page[end:]
-        )
+    idx = normalized_page.find(normalized_chunk)
+    if idx == -1:
+        snippet = normalized_chunk[: min(80, len(normalized_chunk))]
+        idx = normalized_page.find(snippet) if snippet else -1
+        if idx == -1:
+            return escaped_page
+        match_len = len(snippet)
+    else:
+        match_len = len(normalized_chunk)
 
-    return escaped_page
+    start = page_map[idx]
+    end = page_map[min(idx + match_len - 1, len(page_map) - 1)] + 1
+    return (
+        _escape(page_text[:start])
+        + f'<mark class="hl">{_escape(page_text[start:end])}</mark>'
+        + _escape(page_text[end:])
+    )

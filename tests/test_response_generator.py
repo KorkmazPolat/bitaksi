@@ -40,7 +40,11 @@ def test_generates_answer_with_sources():
     assert result.grounded is True
     assert len(result.answer) > 0
     assert len(result.sources) >= 1
+    assert len(result.citations) == 1
     assert result.sources[0]["page"] == 12
+    assert result.sources[0]["highlight_text"] == "Yıllık izin 14 iş günüdür."
+    assert result.citations[0]["source_index"] == 0
+    assert result.citations[0]["evidence_text"] == "Yıllık izin 14 iş günüdür."
 
 
 def test_no_context_returns_ungrounded():
@@ -80,6 +84,75 @@ def test_source_deduplication():
     assert len(pages) == len(set(pages))
 
 
+def test_keeps_distinct_sources_on_same_page_when_chunks_differ():
+    chunks = [
+        RetrievedChunk(
+            chunk_id="c1",
+            text="Calisanlar yillik izin kullanabilir.",
+            source="/docs/hr_policy.pdf",
+            page_num=12,
+            section="Izin Politikasi",
+            score=0.9,
+        ),
+        RetrievedChunk(
+            chunk_id="c2",
+            text="Izinler yonetici onayiyla planlanir.",
+            source="/docs/hr_policy.pdf",
+            page_num=12,
+            section="Onay Sureci",
+            score=0.85,
+        ),
+    ]
+    retrieval = RetrievalResult(
+        chunks=chunks, strategy_used=RetrievalStrategy.DIRECT, grounded=True
+    )
+
+    with patch("src.utils.llm.llm_call", return_value=_mock_message("answer")):
+        from src.generation.response_generator import ResponseGenerator
+        result = ResponseGenerator().generate("query", retrieval)
+
+    assert len(result.sources) == 2
+    assert result.sources[0]["page"] == 12
+    assert result.sources[1]["page"] == 12
+
+
+def test_citations_map_to_distinct_sources_on_same_page():
+    chunks = [
+        RetrievedChunk(
+            chunk_id="c1",
+            text="Calisanlar yillik izin kullanabilir.",
+            source="/docs/hr_policy.pdf",
+            page_num=12,
+            section="Izin Politikasi",
+            score=0.9,
+        ),
+        RetrievedChunk(
+            chunk_id="c2",
+            text="Izinler yonetici onayiyla planlanir.",
+            source="/docs/hr_policy.pdf",
+            page_num=12,
+            section="Onay Sureci",
+            score=0.85,
+        ),
+    ]
+    retrieval = RetrievalResult(
+        chunks=chunks, strategy_used=RetrievalStrategy.DIRECT, grounded=True
+    )
+
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        "Calisanlar yillik izin kullanabilir [hr_policy, s.12]. "
+        "Izinler yonetici onayiyla planlanir [hr_policy, s.12]."
+    )):
+        from src.generation.response_generator import ResponseGenerator
+        result = ResponseGenerator().generate("query", retrieval)
+
+    assert len(result.citations) == 2
+    assert result.citations[0]["source_index"] == 0
+    assert result.citations[1]["source_index"] == 1
+    assert result.citations[0]["evidence_text"] == "Calisanlar yillik izin kullanabilir."
+    assert result.citations[1]["evidence_text"] == "Izinler yonetici onayiyla planlanir."
+
+
 def test_limits_sources_for_generation_context():
     chunks = [
         RetrievedChunk(
@@ -98,7 +171,37 @@ def test_limits_sources_for_generation_context():
 
     with patch("src.utils.llm.llm_call", return_value=_mock_message("answer")):
         from src.generation.response_generator import ResponseGenerator
-        result = ResponseGenerator().generate("query", retrieval)
+        generator = ResponseGenerator()
+        result = generator.generate("query", retrieval)
 
-    assert len(result.sources) <= 3
+    assert len(result.sources) <= generator.max_sources_in_response
     assert result.sources[0]["page"] == 1
+
+
+def test_highlight_text_prefers_best_matching_sentence():
+    chunk = RetrievedChunk(
+        chunk_id="c1",
+        text=(
+            "Yıllık izin 14 iş günüdür. "
+            "İzinler birim yöneticisi onayıyla planlanır."
+        ),
+        source="/docs/hr_policy.pdf",
+        page_num=12,
+        section="İzin Politikası",
+        score=0.9,
+    )
+    retrieval = RetrievalResult(
+        chunks=[chunk],
+        strategy_used=RetrievalStrategy.DIRECT,
+        grounded=True,
+    )
+
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        "İzinler birim yöneticisi onayıyla planlanır. [hr_policy, s.12]"
+    )):
+        from src.generation.response_generator import ResponseGenerator
+        result = ResponseGenerator().generate("İzin nasıl planlanır?", retrieval)
+
+    assert result.sources[0]["highlight_text"] == (
+        "Yıllık izin 14 iş günüdür. İzinler birim yöneticisi onayıyla planlanır."
+    )

@@ -11,23 +11,23 @@ class Settings(BaseSettings):
 
     llm_model: str = "gpt-4o"
     vision_model: str = "gpt-4o"
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = "paraphrase-multilingual-mpnet-base-v2"
 
     chroma_persist_dir: str = "./data/chroma"
     chroma_collection_raw: str = "hr_docs_raw"
     chroma_collection_relatives: str = "hr_docs_relatives"
 
-    top_k: int = 5
-    similarity_threshold: float = 0.6
-    relatives_score_threshold: float = 0.5   # lower bar for Q→chunk matching
-    fallback_top_k: int = 8
+    top_k: int = 8
+    similarity_threshold: float = 0.35
+    relatives_score_threshold: float = 0.35   # lower bar for Q→chunk matching
+    fallback_top_k: int = 12
 
     # Hybrid retrieval
     use_bm25: bool = True
     use_reranking: bool = True
     rerank_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
-    rerank_candidate_k: int = 20   # candidates fed to cross-encoder
-    rerank_final_k: int = 5        # output after reranking
+    rerank_candidate_k: int = 30   # candidates fed to cross-encoder
+    rerank_final_k: int = 8        # output after reranking
     rrf_k: int = 60                # RRF constant (standard value)
 
     # Chunking — hierarchical semantic chunker
@@ -57,8 +57,8 @@ class Settings(BaseSettings):
     max_history_turns: int = 6
     max_query_length: int = 2000
     max_upload_size_mb: int = 100
-    max_generation_chunks: int = 3
-    max_sources_in_response: int = 3
+    max_generation_chunks: int = 5
+    max_sources_in_response: int = 5
 
     # Evaluation
     faithfulness_context_limit: int = 4000

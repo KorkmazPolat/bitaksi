@@ -37,11 +37,21 @@ class SourceRef(BaseModel):
     section: str
     score: float
     chunk_text: str = ""   # sent to frontend for text highlighting
+    highlight_text: str = ""
+
+
+class CitationRef(BaseModel):
+    document: str
+    page: int
+    context: str = ""
+    source_index: int = -1
+    evidence_text: str = ""
 
 
 class ChatResponse(BaseModel):
     answer: str
     sources: list[SourceRef]
+    citations: list[CitationRef]
     strategy_used: str
     grounded: bool
     queries_tried: list[str]
@@ -64,6 +74,7 @@ async def chat(
     return ChatResponse(
         answer=result.answer,
         sources=[SourceRef(**s) for s in result.sources],
+        citations=[CitationRef(**c) for c in result.citations],
         strategy_used=result.strategy_used,
         grounded=result.grounded,
         queries_tried=result.queries_tried,
