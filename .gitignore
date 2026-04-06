@@ -12,3 +12,6 @@ dist/
 build/
 .venv/
 venv/
+bitaksidocuments/
+docs/
+data/
