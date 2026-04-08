@@ -105,30 +105,49 @@ class HybridRetriever:
         k = top_k or self.final_k
         candidate_k = max(self.candidate_k, k * 3)
 
-        # ── Dense retrieval ───────────────────────────────────────────
+        result = self.retrieve_with_trace(query, top_k=k)
+        return result["ranked"]
+
+    def retrieve_with_trace(
+        self,
+        query: str,
+        top_k: int | None = None,
+    ) -> dict:
+        """
+        Return both final ranked chunks and intermediate pipeline outputs.
+        Useful for simulation/debug UIs.
+        """
+        k = top_k or self.final_k
+        candidate_k = max(self.candidate_k, k * 3)
+
         dense_results = self.dense.retrieve(query, top_k=candidate_k)
 
-        # ── BM25 retrieval (optional) ─────────────────────────────────
+        bm25_results: list[RetrievedChunk] = []
         if self.use_bm25:
             bm25_results = self.bm25.retrieve(query, top_k=candidate_k)
             candidates = _rrf_fuse(dense_results, bm25_results, self.rrf_k)
         else:
-            candidates = dense_results
+            candidates = list(dense_results)
 
         if not candidates:
-            return []
+            return {
+                "dense": dense_results,
+                "bm25": bm25_results,
+                "fused": [],
+                "ranked": [],
+            }
 
-        # ── Cross-encoder rerank (optional) ──────────────────────────
         if self.use_reranking:
             ranked = self.reranker.rerank(query, candidates, top_k=k)
         else:
             ranked = sorted(candidates, key=lambda c: c.score, reverse=True)[:k]
 
-        # ── Parent text expansion ─────────────────────────────────────
-        # parent_text already populated from ChromaDB metadata in from_metadata()
-        # Nothing extra needed here — generation layer reads chunk.parent_text
-
-        return ranked
+        return {
+            "dense": list(dense_results),
+            "bm25": list(bm25_results),
+            "fused": list(candidates),
+            "ranked": list(ranked),
+        }
 
     def invalidate_bm25(self) -> None:
         """Call after ingesting new documents to rebuild the BM25 index."""

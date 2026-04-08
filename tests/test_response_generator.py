@@ -30,7 +30,7 @@ def test_generates_answer_with_sources():
     )
 
     with patch("src.utils.llm.llm_call", return_value=_mock_message(
-        "Yıllık izin hakkınız 14 iş günüdür. [hr_policy, s.12]"
+        '{"answer_type":"answer","answer":"Yıllık izin hakkınız 14 iş günüdür. [hr_policy, s.12]"}'
     )):
         from src.generation.response_generator import ResponseGenerator
         result = ResponseGenerator().generate(
@@ -38,6 +38,7 @@ def test_generates_answer_with_sources():
         )
 
     assert result.grounded is True
+    assert result.answer_type == "answer"
     assert len(result.answer) > 0
     assert len(result.sources) >= 1
     assert len(result.citations) == 1
@@ -57,6 +58,7 @@ def test_no_context_returns_ungrounded():
     result = ResponseGenerator().generate(query="anything", retrieval_result=retrieval)
 
     assert result.grounded is False
+    assert result.answer_type == "abstain"
     assert result.answer == NO_CONTEXT_MSG
     assert result.sources == []
     assert "ilgili kaynak" in result.answer.lower()
@@ -76,7 +78,9 @@ def test_source_deduplication():
         chunks=chunks, strategy_used=RetrievalStrategy.DIRECT, grounded=True
     )
 
-    with patch("src.utils.llm.llm_call", return_value=_mock_message("answer")):
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        '{"answer_type":"answer","answer":"answer"}'
+    )):
         from src.generation.response_generator import ResponseGenerator
         result = ResponseGenerator().generate("query", retrieval)
 
@@ -107,7 +111,9 @@ def test_keeps_distinct_sources_on_same_page_when_chunks_differ():
         chunks=chunks, strategy_used=RetrievalStrategy.DIRECT, grounded=True
     )
 
-    with patch("src.utils.llm.llm_call", return_value=_mock_message("answer")):
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        '{"answer_type":"answer","answer":"answer"}'
+    )):
         from src.generation.response_generator import ResponseGenerator
         result = ResponseGenerator().generate("query", retrieval)
 
@@ -140,8 +146,7 @@ def test_citations_map_to_distinct_sources_on_same_page():
     )
 
     with patch("src.utils.llm.llm_call", return_value=_mock_message(
-        "Calisanlar yillik izin kullanabilir [hr_policy, s.12]. "
-        "Izinler yonetici onayiyla planlanir [hr_policy, s.12]."
+        '{"answer_type":"answer","answer":"Calisanlar yillik izin kullanabilir [hr_policy, s.12]. Izinler yonetici onayiyla planlanir [hr_policy, s.12]."}'
     )):
         from src.generation.response_generator import ResponseGenerator
         result = ResponseGenerator().generate("query", retrieval)
@@ -169,7 +174,9 @@ def test_limits_sources_for_generation_context():
         chunks=chunks, strategy_used=RetrievalStrategy.DIRECT, grounded=True
     )
 
-    with patch("src.utils.llm.llm_call", return_value=_mock_message("answer")):
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        '{"answer_type":"answer","answer":"answer"}'
+    )):
         from src.generation.response_generator import ResponseGenerator
         generator = ResponseGenerator()
         result = generator.generate("query", retrieval)
@@ -197,7 +204,7 @@ def test_highlight_text_prefers_best_matching_sentence():
     )
 
     with patch("src.utils.llm.llm_call", return_value=_mock_message(
-        "İzinler birim yöneticisi onayıyla planlanır. [hr_policy, s.12]"
+        '{"answer_type":"answer","answer":"İzinler birim yöneticisi onayıyla planlanır. [hr_policy, s.12]"}'
     )):
         from src.generation.response_generator import ResponseGenerator
         result = ResponseGenerator().generate("İzin nasıl planlanır?", retrieval)
@@ -205,3 +212,40 @@ def test_highlight_text_prefers_best_matching_sentence():
     assert result.sources[0]["highlight_text"] == (
         "Yıllık izin 14 iş günüdür. İzinler birim yöneticisi onayıyla planlanır."
     )
+
+
+def test_abstain_text_is_marked_as_abstain_even_with_retrieved_chunks():
+    retrieval = RetrievalResult(
+        chunks=[_make_chunk()],
+        strategy_used=RetrievalStrategy.DIRECT,
+        grounded=True,
+    )
+
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        '{"answer_type":"abstain","answer":"Bu konuda dokumanlarda bilgi bulunmamaktadir. Netlestirmek icin IK ile iletisime geciniz."}'
+    )):
+        from src.generation.response_generator import ResponseGenerator
+        result = ResponseGenerator().generate("query", retrieval)
+
+    assert result.grounded is False
+    assert result.answer_type == "abstain"
+    assert result.citations == []
+
+
+def test_clarify_response_is_preserved_without_sources():
+    retrieval = RetrievalResult(
+        chunks=[_make_chunk()],
+        strategy_used=RetrievalStrategy.DIRECT,
+        grounded=True,
+    )
+
+    with patch("src.utils.llm.llm_call", return_value=_mock_message(
+        '{"answer_type":"clarify","answer":"Hangi izin turunu kastettiginizi netlestirebilir misiniz?"}'
+    )):
+        from src.generation.response_generator import ResponseGenerator
+        result = ResponseGenerator().generate("buna hakkim var mi", retrieval)
+
+    assert result.grounded is False
+    assert result.answer_type == "clarify"
+    assert result.sources == []
+    assert result.citations == []

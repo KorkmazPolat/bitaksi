@@ -23,35 +23,29 @@ from src.utils import llm
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
-Sen bir İK (İnsan Kaynakları) Bilgi Asistanısın. Görevin, kurum içi İK \
-dokümanlarından gelen bağlam parçalarına dayanarak çalışanların sorularını \
-yanıtlamaktır.
+Sen dokumanlarla sinirli bir IK sohbet asistanisin.
 
-## Temel Kurallar
-1. **YALNIZCA** sağlanan bağlam parçalarından elde ettiğin bilgilere dayanarak \
-yanıt ver. Eğer yanıt bağlamda mevcut değilse, bunu açıkça belirt.
-2. Her önemli ifadeyi, kaynak doküman adı ve sayfa numarasıyla alıntıla \
-(örn. `[İK El Kitabı, s.12]`).
-3. Çalışanın sorusunun dilinde yanıt ver (Türkçe/İngilizce).
-4. Yanıtlar kısa, net ve uygulanabilir olmalıdır.
-5. Emin olmadığında, çalışanı doğrudan İK departmanıyla iletişime geçmeye yönlendir.
-6. Bağlamda tablo veya rakamlar varsa bunları yanıtına dahil et.
-7. Cevabı **doğrudan ver**; yalnızca "X için [doküman, s.Y]'ye bakınız" tarzı yönlendirme cümlesi yazma.
-8. Gereksiz citation tekrarı yapma. Aynı paragrafta aynı kaynağı tekrar tekrar yazma.
-9. Mümkünse cevabı 1-2 kısa paragraf veya en fazla 3 madde ile ver.
-10. Toplam citation sayısını düşük tut; genelde 1-3 citation yeterlidir.
+Gorevin:
+- Kullaniciyla dogal bir diyalog kur.
+- Butun politik, surecsel, sayisal veya hakka dair ifadelerini sadece verilen baglamdan uret.
+- Konusma gecmisini sadece referansi cozmeye yardimci olmak icin kullan; gecmis mesajlari bagimsiz kaynak sayma.
 
-## Yanıt Formatı
-- Kısa bir doğrudan cevap
-- Gerekirse madde işaretleri
-- Gerekli yerlerde kaynak citation
-- Eğer bilgi eksikse, eksik olan kısmı açıkça belirt
+Kesin kurallar:
+1. Baglam disindan bilgi uretme.
+2. Genel IK bilgisi, tahmin, varsayim veya sirket disi norm ekleme.
+3. Sadece su yanit turlerinden birini sec:
+   - `answer`: Baglam soruyu cevaplamak icin yeterliyse kisa ve net cevap ver. Onemli iddialari `[dokuman, s.X]` formatinda cite et.
+   - `abstain`: Baglamda cevap yoksa bunu acikca soyle. Uydurma bilgi verme. Gerekirse IK ile iletisime gecilmesini oner.
+   - `clarify`: Soru muglaksa ve mevcut baglamla hangi politika veya durumun kastedildigi guvenle anlasilamiyorsa tek bir kisa netlestirici soru sor.
+4. `clarify` ve `abstain` durumunda citation ekleme.
+5. `answer` durumunda cevap en fazla 2 kisa paragraf veya 3 madde olsun.
+6. Cevabi kullanicinin dilinde ver.
 
-## YASAK
-- Bağlam dışından bilgi üretme (hallüsinasyon)
-- "Bilmiyorum ama tahmin ediyorum ki…" gibi spekülasyonlar
-- Kişisel görüş veya öneri (yalnızca politika aktarımı)
-- Sadece referansa yönlendiren boş cevap (ör. "detaylar için ... bakınız")
+Sadece gecerli JSON dondur:
+{
+  "answer_type": "answer" | "abstain" | "clarify",
+  "answer": "<kullaniciya gidecek metin>"
+}
 """
 
 REWRITE_PROMPT = """\
@@ -62,6 +56,7 @@ Kurallar:
 2. "bakınız", "detay için şu sayfaya bakın" gibi referansa yönlendiren tek cümle formatı kullanma.
 3. Sadece gerekli yerlerde citation ekle; aynı kaynağı gereksiz tekrar etme.
 4. Bağlamda olmayan bilgi ekleme.
+5. Duz metin don; JSON donme.
 
 Kullanıcı sorusu:
 {query}
@@ -84,6 +79,24 @@ _REFERENCE_ONLY_RE = re.compile(
     r"(bakınız|bakiniz|detay.*için|detay.*icin|see\s+.*page|refer\s+to)",
     re.IGNORECASE,
 )
+_ABSTAIN_RE = re.compile(
+    r"("
+    r"bilgi (bulunamadi|bulunamıyor|bulunamiyor|bulunmamaktadir|bulunmuyor|yer almiyor|yer almamaktadir)"
+    r"|bağlamda mevcut değil|baglamda mevcut degil"
+    r"|dokümanlarda .* yok|dokumanlarda .* yok"
+    r"|ik departman[ıi]yla iletişim|ik departman[ıi]yla iletisim"
+    r"|ik ile iletişim|ik ile iletisim"
+    r")",
+    re.IGNORECASE,
+)
+_CLARIFY_RE = re.compile(
+    r"(neyi kastettiniz|hangi (konu|politika|izin|dok[üu]man|belge|durum|s[üu]re[cç]|harcama|seyahat|talep)|biraz daha netle[sş]tir|biraz daha a[cç]ar m[ıi]s[ıi]n[ıi]z|sorunuzu biraz daha)",
+    re.IGNORECASE,
+)
+_DEICTIC_QUERY_RE = re.compile(
+    r"\b(bu|buna|bunu|bunlar|o|onu|onun|orada|burada|boyle|böyle|bu durumda|o durumda)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -99,6 +112,7 @@ class GenerationResult:
     citations: list[dict]
     strategy_used: str
     grounded: bool
+    answer_type: Literal["answer", "abstain", "clarify"] = "answer"
     queries_tried: list[str] = field(default_factory=list)
 
 
@@ -126,6 +140,7 @@ class ResponseGenerator:
                 citations=[],
                 strategy_used=str(retrieval_result.strategy_used),
                 grounded=False,
+                answer_type="abstain",
                 queries_tried=retrieval_result.queries_tried,
             )
 
@@ -139,9 +154,11 @@ class ResponseGenerator:
             system=SYSTEM_PROMPT,
             messages=messages,
         )
-        answer = self._coerce_text_response(response).strip()
+        raw_text = self._coerce_text_response(response).strip()
+        parsed_type, answer = self._parse_model_output(raw_text)
+        answer = answer.strip()
 
-        if self._needs_rewrite(answer):
+        if parsed_type == "answer" and self._needs_rewrite(answer):
             rewrite = llm.llm_call(
                 model=self.model,
                 max_tokens=1500,
@@ -159,15 +176,26 @@ class ResponseGenerator:
             )
             answer = self._coerce_text_response(rewrite).strip() or answer
 
-        sources = self._extract_sources(selected_chunks, answer)
-        citations = self._extract_citations(answer, sources)
+        sources = self._extract_sources(selected_chunks, answer) if parsed_type == "answer" else []
+        citations = self._extract_citations(answer, sources) if parsed_type == "answer" else []
+        answer_type = self._finalize_answer_type(
+            query=query,
+            parsed_type=parsed_type,
+            answer=answer,
+            citations=citations,
+        )
+        grounded = answer_type == "answer"
+        if not grounded:
+            sources = []
+            citations = []
 
         return GenerationResult(
             answer=answer,
             sources=sources,
             citations=citations,
             strategy_used=str(retrieval_result.strategy_used),
-            grounded=True,
+            grounded=grounded,
+            answer_type=answer_type,
             queries_tried=retrieval_result.queries_tried,
         )
 
@@ -311,8 +339,11 @@ class ResponseGenerator:
         messages.append({
             "role": "user",
             "content": (
-                f"## İlgili İK Dokümanı Bağlamı\n\n{context}\n\n"
-                f"---\n\n## Çalışan Sorusu\n\n{query}"
+                f"## Konusma Notu\n"
+                f"Konusma gecmisi sadece referans cozumleme icindir; "
+                f"olgusal kaynak olarak kullanma.\n\n"
+                f"## Ilgili IK Dokumani Baglami\n\n{context}\n\n"
+                f"---\n\n## Calisan Sorusu\n\n{query}"
             ),
         })
         return messages
@@ -417,3 +448,77 @@ class ResponseGenerator:
         # Very short directional answers are usually low quality for this project.
         is_short = len(text) < 220
         return has_reference_only_phrase and (is_short or not has_citation)
+
+    @staticmethod
+    def _is_abstain_answer(answer: str, citations: list[dict]) -> bool:
+        text = (answer or "").strip()
+        if not text:
+            return True
+        if text == NO_CONTEXT_MSG.strip():
+            return True
+        if citations:
+            return False
+        return bool(_ABSTAIN_RE.search(text))
+
+    @classmethod
+    def _is_clarify_answer(cls, query: str, answer: str) -> bool:
+        text = (answer or "").strip()
+        if not text:
+            return False
+        if _CLARIFY_RE.search(text):
+            return True
+        return (
+            text.endswith("?")
+            and len(text) <= 220
+            and cls._query_needs_clarification(query)
+        )
+
+    @staticmethod
+    def _query_needs_clarification(query: str) -> bool:
+        text = (query or "").strip()
+        if not text:
+            return True
+        tokens = re.findall(r"\w+", text.lower())
+        if len(tokens) <= 3:
+            return True
+        return bool(_DEICTIC_QUERY_RE.search(text))
+
+    @staticmethod
+    def _normalize_answer_type(value: str | None) -> Literal["answer", "abstain", "clarify"] | None:
+        normalized = (value or "").strip().lower()
+        if normalized in {"answer", "abstain", "clarify"}:
+            return normalized
+        return None
+
+    def _parse_model_output(
+        self,
+        raw_text: str,
+    ) -> tuple[Literal["answer", "abstain", "clarify"], str]:
+        parsed_type: Literal["answer", "abstain", "clarify"] | None = None
+        parsed_answer = raw_text
+        try:
+            parsed = llm.parse_llm_json(raw_text)
+        except Exception:
+            parsed = None
+
+        if isinstance(parsed, dict):
+            parsed_type = self._normalize_answer_type(parsed.get("answer_type"))
+            candidate_answer = parsed.get("answer")
+            if isinstance(candidate_answer, str) and candidate_answer.strip():
+                parsed_answer = candidate_answer.strip()
+
+        return parsed_type or "answer", parsed_answer
+
+    def _finalize_answer_type(
+        self,
+        *,
+        query: str,
+        parsed_type: Literal["answer", "abstain", "clarify"],
+        answer: str,
+        citations: list[dict],
+    ) -> Literal["answer", "abstain", "clarify"]:
+        if parsed_type == "clarify" or self._is_clarify_answer(query, answer):
+            return "clarify"
+        if parsed_type == "abstain" or self._is_abstain_answer(answer, citations):
+            return "abstain"
+        return "answer"

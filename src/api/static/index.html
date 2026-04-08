@@ -128,6 +128,43 @@
 
     .msg.bot { align-self: flex-start; background: #fff; }
 
+    .msg-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border: 1px solid var(--line);
+    }
+
+    .status-pill.answer {
+      background: #ecfdf5;
+      border-color: #a7f3d0;
+      color: #047857;
+    }
+
+    .status-pill.abstain {
+      background: #fff7ed;
+      border-color: #fdba74;
+      color: #c2410c;
+    }
+
+    .status-pill.clarify {
+      background: #fffbeb;
+      border-color: #fcd34d;
+      color: #b45309;
+    }
+
     .sources {
       margin-top: 8px;
       display: flex;
@@ -323,6 +360,7 @@
       <div class="subtitle">Kaynaklara dayali chat</div>
     </div>
     <div class="spacer"></div>
+    <a class="link-btn" href="/static/simulation.html">Simulasyon</a>
     <a class="link-btn" href="/static/chunks.html">Chunk Detaylari</a>
     <button class="btn" onclick="document.getElementById('fileInput').click()">Dokuman Yukle</button>
     <input id="fileInput" type="file" accept=".pdf,.doc,.docx" multiple style="display:none" />
@@ -332,7 +370,7 @@
     <main class="layout">
       <section class="card">
         <div id="messages">
-          <div class="msg bot">Merhaba. Dokuman yukleyip soru sorabilirsiniz.</div>
+          <div class="msg bot">Merhaba. Dokumanlara dayali sorulari yanitlarim, bilgi yetersizse bunu acikca soylerim ve soru muğlaksa once netlestiririm.</div>
         </div>
         <div class="input-row">
           <textarea id="query" placeholder="Sorunuzu yazin..."></textarea>
@@ -496,7 +534,13 @@
       return block;
     }
 
-    function addMessage(role, text, sources = [], citations = []) {
+    function formatAnswerType(answerType) {
+      if (answerType === "clarify") return "Netlestirme";
+      if (answerType === "abstain") return "Dokumanda Yok";
+      return "Kaynakli Yanit";
+    }
+
+    function addMessage(role, text, sources = [], citations = [], meta = {}) {
       const wrap = document.getElementById("messages");
       const div = document.createElement("div");
       div.className = `msg ${role}`;
@@ -505,11 +549,26 @@
             ...entry,
             source_index: citations[index]?.source_index ?? -1,
             evidence_text: citations[index]?.evidence_text || "",
+            answer_text: cleanAnswerText(entry.context || ""),
           }))
         : [];
-      div.innerHTML = role === "bot"
+      const contentHtml = role === "bot"
         ? renderBotTextWithCitations(text, citationEntries)
         : escapeHtml(text).replace(/\n/g, "<br>");
+
+      if (role === "bot" && meta.answerType) {
+        const header = document.createElement("div");
+        header.className = "msg-meta";
+        const pill = document.createElement("span");
+        pill.className = `status-pill ${meta.answerType}`;
+        pill.textContent = formatAnswerType(meta.answerType);
+        header.appendChild(pill);
+        div.appendChild(header);
+      }
+
+      const body = document.createElement("div");
+      body.innerHTML = contentHtml;
+      div.appendChild(body);
 
       if (sources.length) {
         const citedPages = extractCitedPages(text);
@@ -541,6 +600,7 @@
       wrap.appendChild(div);
 
       if (role === "bot") {
+        lastCitations = citationEntries;
         div.querySelectorAll(".inline-cite").forEach((btn) => {
           btn.addEventListener("click", async () => {
             const citationIndex = Number(btn.getAttribute("data-cite-index") || "-1");
@@ -552,6 +612,27 @@
       }
 
       wrap.scrollTop = wrap.scrollHeight;
+    }
+
+    function cleanAnswerText(text) {
+      return (text || "")
+        .replace(/\[[^\]]+\]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function uniqueNonEmpty(values) {
+      const out = [];
+      const seen = new Set();
+      (values || []).forEach((value) => {
+        const normalized = cleanAnswerText(value);
+        if (!normalized) return;
+        const key = normalized.toLocaleLowerCase("tr-TR");
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(normalized);
+      });
+      return out;
     }
 
     function renderBotTextWithCitations(text, citations = []) {
@@ -600,6 +681,8 @@
         const answer = data.answer || "Yanit alinamadi.";
         const sources = data.sources || [];
         const citations = data.citations || [];
+        const answerType = data.answer_type || "answer";
+        const grounded = Boolean(data.grounded);
 
         history.push({ role: "user", content: query });
         history.push({ role: "assistant", content: answer });
@@ -607,8 +690,8 @@
 
         lastSources = sources;
         lastCitations = citations;
-        addMessage("bot", answer, sources, citations);
-        if (sources.length) {
+        addMessage("bot", answer, sources, citations, { answerType, grounded });
+        if (answerType === "answer" && sources.length) {
           showAnswerOnDocument(0);
         }
       } catch {
@@ -655,14 +738,10 @@
       return { normalized, indexMap };
     }
 
-    function markExactAnswerSpan(textLayer, snippetText) {
-      const target = normalizeWithMap(snippetText || "").normalized;
-      if (!target) return false;
-
+    function buildCombinedSpanMap(textLayer) {
       const spans = Array.from(textLayer.querySelectorAll("span"));
       const combinedParts = [];
       const charToSpan = [];
-
       spans.forEach((sp, spanIndex) => {
         const { normalized } = normalizeWithMap(sp.textContent || "");
         if (!normalized) return;
@@ -678,8 +757,15 @@
         combinedParts.pop();
         charToSpan.pop();
       }
+      return { spans, combined: combinedParts.join(""), charToSpan };
+    }
 
-      const combined = combinedParts.join("");
+    function markExactAnswerSpan(textLayer, snippetText) {
+      const target = normalizeWithMap(snippetText || "").normalized;
+      if (!target) return false;
+
+      const { spans, combined, charToSpan } = buildCombinedSpanMap(textLayer);
+
       const start = combined.indexOf(target);
       if (start === -1) return false;
 
@@ -746,6 +832,17 @@
         spans[spanData[i].index]?.classList.add("matched");
       }
       return true;
+    }
+
+    function markHighlightCandidates(textLayer, candidates) {
+      const items = uniqueNonEmpty(candidates);
+      for (const candidate of items) {
+        if (markExactAnswerSpan(textLayer, candidate)) return true;
+      }
+      for (const candidate of items) {
+        if (markApproximateAnswerSpan(textLayer, candidate)) return true;
+      }
+      return false;
     }
 
     async function resolveBestPage(source) {
@@ -825,11 +922,10 @@
         textDivs,
       }).promise;
 
-      const highlightText = source.highlight_text || source.chunk_text || "";
-      const matched = markExactAnswerSpan(textLayer, highlightText);
-      if (!matched) {
-        markApproximateAnswerSpan(textLayer, highlightText);
-      }
+      markHighlightCandidates(
+        textLayer,
+        source.highlight_candidates || [source.highlight_text || source.chunk_text || ""]
+      );
     }
 
     async function showFallback(source, pageToOpen) {
@@ -841,7 +937,10 @@
       canvas.height = 0;
       textLayer.innerHTML = "";
 
-      const chunkParam = encodeURIComponent(source.highlight_text || source.chunk_text || "");
+      const firstHighlight = uniqueNonEmpty(
+        source.highlight_candidates || [source.highlight_text || source.chunk_text || ""]
+      )[0] || "";
+      const chunkParam = encodeURIComponent(firstHighlight);
       const pageUrl = `${API}/documents/${encodeURIComponent(source.document)}/page/${pageToOpen}?chunk_text=${chunkParam}`;
       const res = await fetch(pageUrl);
       const data = await res.json();
@@ -884,12 +983,23 @@
       return best;
     }
 
+    function findCitationForSourceIndex(sourceIndex) {
+      return (lastCitations || []).find((citation) => citation.source_index === sourceIndex) || null;
+    }
+
     async function showCitationOnDocument(citation, sources = []) {
       const source = findBestSourceForCitation(citation, sources);
       if (source) {
         const citationSource = {
           ...source,
-          highlight_text: citation.evidence_text || source.highlight_text || source.chunk_text || "",
+          highlight_candidates: uniqueNonEmpty([
+            citation.answer_text,
+            citation.context,
+            citation.evidence_text,
+            source.highlight_text,
+            source.chunk_text,
+          ]),
+          highlight_text: citation.answer_text || citation.evidence_text || source.highlight_text || source.chunk_text || "",
         };
         openDrawer();
         const pageToOpen = await resolveBestPage(citationSource);
@@ -922,13 +1032,25 @@
     async function showAnswerOnDocument(idx) {
       const source = lastSources[idx];
       if (!source) return;
+      const citation = findCitationForSourceIndex(idx);
+      const answerSource = {
+        ...source,
+        highlight_candidates: uniqueNonEmpty([
+          citation?.answer_text,
+          citation?.context,
+          citation?.evidence_text,
+          source.highlight_text,
+          source.chunk_text,
+        ]),
+        highlight_text: citation?.answer_text || citation?.evidence_text || source.highlight_text || source.chunk_text || "",
+      };
       openDrawer();
-      const pageToOpen = await resolveBestPage(source);
+      const pageToOpen = await resolveBestPage(answerSource);
 
       try {
-        await renderPdfWithHighlight(source, pageToOpen);
+        await renderPdfWithHighlight(answerSource, pageToOpen);
       } catch {
-        await showFallback(source, pageToOpen);
+        await showFallback(answerSource, pageToOpen);
       }
     }
 

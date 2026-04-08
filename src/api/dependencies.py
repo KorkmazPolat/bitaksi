@@ -3,6 +3,7 @@ FastAPI dependency injection: shared service instances.
 """
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from collections import deque
@@ -39,11 +40,13 @@ class ChatDebugRecord:
     query: str
     answer: str
     grounded: bool
+    answer_type: str
     strategy_used: str
     queries_tried: list[str] = field(default_factory=list)
     sources: list[dict] = field(default_factory=list)
     citations: list[dict] = field(default_factory=list)
     retrieved_chunks: list[DebugChunkRecord] = field(default_factory=list)
+    trace_steps: list[dict] = field(default_factory=list)
 
 
 class ChatDebugStore:
@@ -69,6 +72,11 @@ class ChatDebugStore:
 class ChatService:
     """Orchestrates retrieval → generation for a chat query."""
 
+    _FOLLOW_UP_RE = re.compile(
+        r"\b(bu|buna|bunu|bunlar|o|onu|onun|orada|burada|boyle|böyle|bu durumda|o durumda)\b",
+        re.IGNORECASE,
+    )
+
     def __init__(
         self,
         grounding: SmartGroundingRetriever,
@@ -84,7 +92,8 @@ class ChatService:
         query: str,
         history=None,
     ) -> GenerationResult:
-        retrieval_result = self.grounding.retrieve(query)
+        retrieval_query = self._build_retrieval_query(query, history or [])
+        retrieval_result = self.grounding.retrieve(retrieval_query)
         result = self.generator.generate(
             query=query,
             retrieval_result=retrieval_result,
@@ -92,6 +101,32 @@ class ChatService:
         )
         self.debug_store.add(self._build_debug_record(query, retrieval_result, result))
         return result
+
+    @classmethod
+    def _build_retrieval_query(cls, query: str, history) -> str:
+        text = (query or "").strip()
+        if not text:
+            return text
+
+        recent_user_turns = [
+            getattr(item, "content", "")
+            for item in (history or [])
+            if getattr(item, "role", None) == "user" and getattr(item, "content", "").strip()
+        ]
+        if not recent_user_turns:
+            return text
+
+        token_count = len(re.findall(r"\w+", text.lower()))
+        looks_follow_up = token_count <= 5 or bool(cls._FOLLOW_UP_RE.search(text))
+        if not looks_follow_up:
+            return text
+
+        anchor = recent_user_turns[-1].strip()
+        if not anchor:
+            return text
+        if anchor.casefold() in text.casefold():
+            return text
+        return f"{anchor}\nTakip sorusu: {text}"
 
     @staticmethod
     def _build_debug_record(
@@ -104,6 +139,7 @@ class ChatService:
             query=query,
             answer=result.answer,
             grounded=result.grounded,
+            answer_type=result.answer_type,
             strategy_used=result.strategy_used,
             queries_tried=list(result.queries_tried),
             sources=list(result.sources),
@@ -120,6 +156,7 @@ class ChatService:
                 )
                 for chunk in retrieval_result.chunks
             ],
+            trace_steps=list(retrieval_result.trace_steps),
         )
 
 

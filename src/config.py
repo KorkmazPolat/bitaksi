@@ -48,10 +48,10 @@ class Settings(BaseSettings):
     # Ingestion
     batch_upsert_size: int = 100
     docx_page_paragraph_count: int = 50
-    min_chunk_length_for_relatives: int = 50
+    min_chunk_length_for_relatives: int = 20
     chunk_preview_length: int = 1500        # chars sent to relative-question LLM
     min_relative_question_length: int = 12
-    max_relative_question_length: int = 180
+    max_relative_question_length: int = 220
 
     # Generation
     max_history_turns: int = 6
