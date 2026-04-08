@@ -1,0 +1,1487 @@
+{
+  "benchmark_name": "bitaksi_hr_benchmark_v2",
+  "version": "2.0",
+  "created": "2026-04-08",
+  "description": "Kapsamlı ve yüksek kaliteli HR RAG benchmark seti. 5 doküman üzerinde 103 soru: kategori bazlı retrieval/generation/abstain/edge-case testleri için.",
+  "documents": [
+    "performans_kilavuzu_2025",
+    "izin_proseduru",
+    "masraf_uygulamasi",
+    "seyahat_proseduru",
+    "zimmetli_esya_proseduru"
+  ],
+  "document_aliases": {
+    "performans_kilavuzu_2025": "2025 Yil Sonu Performans Degerlendirme Donemi Kilavuzu",
+    "izin_proseduru": "Izin Proseduru Guncel",
+    "masraf_uygulamasi": "Masraf Uygulamasi - Calisan",
+    "seyahat_proseduru": "Seyahat Proseduru",
+    "zimmetli_esya_proseduru": "Zimmetli Esya Kullanim Proseduru"
+  },
+  "category_descriptions": {
+    "performans": "2025 Yıl Sonu Performans Değerlendirme Kılavuzu soruları",
+    "izin": "İzin Prosedürü soruları (yıllık, mazeret, ücretsiz, vb.)",
+    "masraf": "Masraf Uygulaması soruları (yiyecek, ulaşım, belge kuralları)",
+    "seyahat": "Seyahat Prosedürü soruları (rezervasyon, onay, fatura)",
+    "zimmet": "Zimmetli Eşya Kullanım Prosedürü soruları (bilgisayar, telefon, envanter)",
+    "multi_doc": "Birden fazla doküman gerektiren sorular",
+    "abstain": "Sistemin kesinlikle CEVAP VERMEMESİ gereken sorular (kapsam dışı)"
+  },
+  "items": [
+    {
+      "id": "P001",
+      "category": "performans",
+      "subcategory": "kapsam_tarih",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "2025 yıl sonu performans değerlendirme dönemi hangi tarih aralığındaki performansı kapsıyor?",
+      "reference_signals": [
+        "1 Temmuz 2025",
+        "31 Aralık 2025"
+      ]
+    },
+    {
+      "id": "P002",
+      "category": "performans",
+      "subcategory": "kapsam_tarih",
+      "difficulty": "easy",
+      "question_type": "eligibility",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Kimler 2025 performans değerlendirme sürecine dahil oluyor?",
+      "reference_signals": [
+        "1 Ekim 2025",
+        "öncesinde bitaksi'ye dahil olanlar"
+      ]
+    },
+    {
+      "id": "P003",
+      "category": "performans",
+      "subcategory": "geri_bildirim",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Performans döneminde geri bildirim almak için kaç bitaksili seçebilirim?",
+      "reference_signals": [
+        "en az 3",
+        "en fazla 5"
+      ]
+    },
+    {
+      "id": "P004",
+      "category": "performans",
+      "subcategory": "surec",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Performans değerlendirme süreci hangi ana adımlardan oluşuyor?",
+      "reference_signals": [
+        "Geri Bildirim Paylaş",
+        "Performansı Değerlendir",
+        "Gelişim Odaklarını Belirle"
+      ]
+    },
+    {
+      "id": "P005",
+      "category": "performans",
+      "subcategory": "surec",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Performans değerlendirmesinde bitaksiliye hangi temel sorular soruluyor?",
+      "reference_signals": [
+        "Neler iyi gitti",
+        "Neler daha iyi olabilirdi",
+        "Hangi değerlerimizi daha çok temsil ediyorsun",
+        "Kişisel gelişim",
+        "Önümüzdeki dönem iş odak alanları"
+      ]
+    },
+    {
+      "id": "P006",
+      "category": "performans",
+      "subcategory": "geri_bildirim",
+      "difficulty": "hard",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Eşdeğer seçimi için son tarih nedir ve geri bildirim istenecek kişiler hangi profilde olmalıdır?",
+      "reference_signals": [
+        "2 Ocak",
+        "eşdeğer ya da daha üst roller",
+        "yeterli gözlem"
+      ]
+    },
+    {
+      "id": "P007",
+      "category": "performans",
+      "subcategory": "terfi",
+      "difficulty": "hard",
+      "question_type": "eligibility",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Yıl sonu terfi süreci için temel uygunluk kriterleri nelerdir?",
+      "reference_signals": [
+        "en az 6 aydır bitaksili olmak",
+        "son iki performans puanı ortalaması en az İyi Oluyor",
+        "son bir senede disiplin sürecinde yer almamış olmak"
+      ]
+    },
+    {
+      "id": "P008",
+      "category": "performans",
+      "subcategory": "kapsam_tarih",
+      "difficulty": "easy",
+      "question_type": "eligibility",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "2025 yıl sonu değerlendirme sürecinin dışında kalan çalışanlar kimlerdir?",
+      "reference_signals": [
+        "1 Ekim 2025",
+        "sonrasında",
+        "dahil olmayacak"
+      ]
+    },
+    {
+      "id": "P009",
+      "category": "performans",
+      "subcategory": "surec",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "\"Gelişim Odaklarını Belirle\" adımı değerlendirme sürecinde ne anlama gelir?",
+      "reference_signals": [
+        "Gelişim Odaklarını Belirle",
+        "gelişim"
+      ]
+    },
+    {
+      "id": "P010",
+      "category": "performans",
+      "subcategory": "geri_bildirim",
+      "difficulty": "medium",
+      "question_type": "eligibility",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "360 derece geri bildirim verecek kişileri seçerken hangi kriterlere dikkat etmek gerekiyor?",
+      "reference_signals": [
+        "eşdeğer ya da daha üst rol",
+        "yeterli gözlem"
+      ]
+    },
+    {
+      "id": "P011",
+      "category": "performans",
+      "subcategory": "terfi",
+      "difficulty": "hard",
+      "question_type": "eligibility",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Terfi için gerekli olan minimum çalışma süresi nedir?",
+      "reference_signals": [
+        "en az 6 ay",
+        "bitaksili olmak"
+      ]
+    },
+    {
+      "id": "P012",
+      "category": "performans",
+      "subcategory": "terfi",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Terfiye uygunluk için \"İyi Oluyor\" performans puanı ne zaman geçerli sayılıyor?",
+      "reference_signals": [
+        "İyi Oluyor",
+        "son iki performans puanı ortalaması"
+      ]
+    },
+    {
+      "id": "P013",
+      "category": "performans",
+      "subcategory": "terfi",
+      "difficulty": "medium",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Disiplin süreci geçmişi terfiye uygunluğu nasıl etkiler?",
+      "reference_signals": [
+        "disiplin sürecinde yer almamış",
+        "son bir senede"
+      ]
+    },
+    {
+      "id": "P014",
+      "category": "performans",
+      "subcategory": "surec",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Performans değerlendirme sürecindeki temel tarihleri özetleyebilir misin?",
+      "reference_signals": [
+        "2 Ocak",
+        "1 Temmuz 2025",
+        "31 Aralık 2025"
+      ]
+    },
+    {
+      "id": "P015",
+      "category": "performans",
+      "subcategory": "geri_bildirim",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025"],
+      "question": "Değerlendirme sürecinde özdeğerlendirme formu hangi soruları kapsamaktadır?",
+      "reference_signals": [
+        "Neler iyi gitti",
+        "Neler daha iyi olabilirdi",
+        "Kişisel gelişim"
+      ]
+    },
+
+    {
+      "id": "I001",
+      "category": "izin",
+      "subcategory": "izin_turleri",
+      "difficulty": "hard",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Bitaksi'de hangi izin türleri tanımlı?",
+      "reference_signals": [
+        "yıllık ücretli izin",
+        "mazeret izni",
+        "ücretsiz izin",
+        "hastalık izni",
+        "akademik izin",
+        "taşınma izni",
+        "ölüm izni",
+        "doğum izni"
+      ]
+    },
+    {
+      "id": "I002",
+      "category": "izin",
+      "subcategory": "talep_sureci",
+      "difficulty": "easy",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "İzin taleplerini hangi sistem üzerinden açmak gerekiyor ve yönetici onayı zorunlu mu?",
+      "reference_signals": [
+        "BambooHR",
+        "yönetici onayı",
+        "onaylanmayan izinler kullanılamaz"
+      ]
+    },
+    {
+      "id": "I003",
+      "category": "izin",
+      "subcategory": "talep_sureci",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Yıllık izin talebi normal durumda kaç iş günü önceden açılmalıdır?",
+      "reference_signals": [
+        "en az 15 iş günü önceden"
+      ]
+    },
+    {
+      "id": "I004",
+      "category": "izin",
+      "subcategory": "talep_sureci",
+      "difficulty": "medium",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Yöneticisi onaylamadan çalışan izne çıkabilir mi, çıkarsa ne olabilir?",
+      "reference_signals": [
+        "izin kullanamaz",
+        "disiplin süreci başlatılabilir"
+      ]
+    },
+    {
+      "id": "I005",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Bitaksi'de hizmet süresine göre yıllık izin günleri nasıl hesaplanıyor?",
+      "reference_signals": [
+        "1-5 yıl 14 iş günü",
+        "6-14 yıl 20 iş günü",
+        "15 yıl ve üzeri 26 iş günü"
+      ]
+    },
+    {
+      "id": "I006",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "medium",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Bir yılı dolmadan yıllık izin kullanılabilir mi, kullanılırsa ne olur?",
+      "reference_signals": [
+        "bir yıl dolmadan da kullanabilir",
+        "izin bakiyesi eksiye düşer",
+        "ayrılırsa son hakediş"
+      ]
+    },
+    {
+      "id": "I007",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Yıllık izin bakiyesi en fazla kaç gün eksiye düşebilir?",
+      "reference_signals": [
+        "en fazla 14 gün eksiye düşebilir"
+      ]
+    },
+    {
+      "id": "I008",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Ulusal bayramlar, resmi tatiller ve cumartesi yıllık izinden sayılır mı?",
+      "reference_signals": [
+        "ulusal bayram ve resmi tatiller sayılmaz",
+        "cumartesi iş günü olarak dikkate alınmaz"
+      ]
+    },
+    {
+      "id": "I009",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Mazeret izni yılda en fazla ne kadar kullanılabilir?",
+      "reference_signals": [
+        "yılda en fazla 24 saat",
+        "saat bazında ya da gün bazında kullanılabilir"
+      ]
+    },
+    {
+      "id": "I010",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Evlilik izni, babalık izni ve taşınma izni süreleri kaç gün?",
+      "reference_signals": [
+        "evlilik izni 3 gün",
+        "doğum izni",
+        "5 gün",
+        "taşınma izni en fazla 1 gün"
+      ]
+    },
+    {
+      "id": "I011",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "hard",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Akademik izin hakkı haftalık ne kadar ve hastalık izninde rapor paylaşımı zorunlu mu?",
+      "reference_signals": [
+        "akademik izin haftada 8 saat",
+        "hastalık izninde rapor paylaşımı zorunlu"
+      ]
+    },
+    {
+      "id": "I012",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "hard",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Ücretsiz izin bir takvim yılında en fazla ne kadar verilebilir ve hangi istisnai durumlarda talep edilebilir?",
+      "reference_signals": [
+        "bir haftayı geçemez",
+        "eşin zorunlu görevlendirmesi",
+        "doğum sonrası 6 aya kadar"
+      ]
+    },
+    {
+      "id": "I013",
+      "category": "izin",
+      "subcategory": "talep_sureci",
+      "difficulty": "easy",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "İzin talebini kim onaylamak zorundadır?",
+      "reference_signals": [
+        "yönetici",
+        "onay"
+      ]
+    },
+    {
+      "id": "I014",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Yıllık izin 1 ila 5 yıl arasında çalışan bir bitaksiliye kaç iş günüdür?",
+      "reference_signals": [
+        "14 iş günü",
+        "1-5 yıl"
+      ]
+    },
+    {
+      "id": "I015",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "15 yıl ve üzeri kıdemli bir çalışanın yıllık izin hakkı kaç iş günüdür?",
+      "reference_signals": [
+        "26 iş günü",
+        "15 yıl ve üzeri"
+      ]
+    },
+    {
+      "id": "I016",
+      "category": "izin",
+      "subcategory": "talep_sureci",
+      "difficulty": "medium",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Çalışan izne çıkmadan önce mutlaka ne yapmalıdır?",
+      "reference_signals": [
+        "BambooHR",
+        "yönetici onayı",
+        "onaylanmadan"
+      ]
+    },
+    {
+      "id": "I017",
+      "category": "izin",
+      "subcategory": "yillik_izin",
+      "difficulty": "medium",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Çalışan şirketten ayrılırken izin bakiyesi eksideyse ne olur?",
+      "reference_signals": [
+        "son hakediş",
+        "düşülür",
+        "bakiyesi eksi"
+      ]
+    },
+    {
+      "id": "I018",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Babalık (doğum) izni kaç gün ve nasıl kullanılır?",
+      "reference_signals": [
+        "doğum izni",
+        "5 gün"
+      ]
+    },
+    {
+      "id": "I019",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Bir çalışanın evlenmesi durumunda kaç gün izin hakkı vardır?",
+      "reference_signals": [
+        "evlilik izni",
+        "3 gün"
+      ]
+    },
+    {
+      "id": "I020",
+      "category": "izin",
+      "subcategory": "diger_izin",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["izin_proseduru"],
+      "question": "Taşınma izni kaç gündür ve şartları nelerdir?",
+      "reference_signals": [
+        "taşınma izni",
+        "en fazla 1 gün"
+      ]
+    },
+
+    {
+      "id": "M001",
+      "category": "masraf",
+      "subcategory": "yiyecek_icecek",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Mesai saatleri dışı yiyecek-içecek harcamaları için günlük kişi başı limit nedir?",
+      "reference_signals": [
+        "günlük kişi başı 400 TL",
+        "KDV dahil"
+      ]
+    },
+    {
+      "id": "M002",
+      "category": "masraf",
+      "subcategory": "yiyecek_icecek",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "18:00 sonrası yiyecek-içecek masrafı yapılacaksa hangi mesai teyidi gerekiyor?",
+      "reference_signals": [
+        "19:30 sonrasında mesai yapıldığı teyidi",
+        "çalışan ve yönetici"
+      ]
+    },
+    {
+      "id": "M003",
+      "category": "masraf",
+      "subcategory": "yiyecek_icecek",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Birden fazla kişiyle yapılan yiyecek-içecek harcamasını kim ödemeli ve formda neler belirtilmeli?",
+      "reference_signals": [
+        "en üst seviye yönetici",
+        "kimler adına yapıldığı",
+        "masraf açıklaması"
+      ]
+    },
+    {
+      "id": "M004",
+      "category": "masraf",
+      "subcategory": "yiyecek_icecek",
+      "difficulty": "medium",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "\"Temsil ve Ağırlama Giderleri\" masrafı hangi durumda ödenmez?",
+      "reference_signals": [
+        "üst düzey yönetici onayı olmadan ödenmez",
+        "muhasebe tarafından reddedilir"
+      ]
+    },
+    {
+      "id": "M005",
+      "category": "masraf",
+      "subcategory": "kabul_edilmeyen",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Çalışma saatleri içindeki yemekler, remote çalışma harcamaları veya gıda dışı ürünler masraf yapılabilir mi?",
+      "reference_signals": [
+        "çalışma saatleri içindeki harcamalar masraf değil",
+        "remote çalışma harcamaları masraf değil",
+        "gıda dışı harcamalar masraf değil"
+      ]
+    },
+    {
+      "id": "M006",
+      "category": "masraf",
+      "subcategory": "ulasim",
+      "difficulty": "easy",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Aylık akbil desteği için hangi kart kullanılabilir ve talep ne zamana kadar iletilmeli?",
+      "reference_signals": [
+        "kişinin kendi adına kayıtlı İstanbulkart",
+        "her ayın 5'ine kadar",
+        "People ekibi"
+      ]
+    },
+    {
+      "id": "M007",
+      "category": "masraf",
+      "subcategory": "ulasim",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Ofis-ev taksi masrafı hangi saatten sonra kabul edilir ve hangi belge istenir?",
+      "reference_signals": [
+        "21:00'dan sonra",
+        "kaşeli taksi fişi",
+        "rota, açıklama, saat"
+      ]
+    },
+    {
+      "id": "M008",
+      "category": "masraf",
+      "subcategory": "ulasim",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Şirket aracı yakıtı ve araç yıkama masrafı için hangi kurallar geçerli?",
+      "reference_signals": [
+        "yakıt taşıt tanıma sistemi",
+        "araç yıkama ayda en fazla 2 defa",
+        "trafik cezaları masraf kabul edilmez"
+      ]
+    },
+    {
+      "id": "M009",
+      "category": "masraf",
+      "subcategory": "belge_kural",
+      "difficulty": "hard",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Şirket kredi kartı ve şahsi kart/nakit harcamaları aynı formda beyan edilebilir mi, ekstre sorununda ne yapılmalı?",
+      "reference_signals": [
+        "ayrı ayrı formlar",
+        "finans ve muhasebeye bilgi verip banka ile temas",
+        "şirket kredi kartı ile kişisel harcama yapılmamalı"
+      ]
+    },
+    {
+      "id": "M010",
+      "category": "masraf",
+      "subcategory": "belge_kural",
+      "difficulty": "hard",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Masraf ödemesi için belge ve fatura tarafında hangi temel kurallar var?",
+      "reference_signals": [
+        "belgeler net ve okunabilir olmalı",
+        "fiş veya fatura eksiksiz olmalı",
+        "fatura bitaksi adına olmalı",
+        "slip tek başına yeterli değil",
+        "yemek kartı ile yapılan harcama masraf yapılamaz"
+      ]
+    },
+    {
+      "id": "M011",
+      "category": "masraf",
+      "subcategory": "kabul_edilmeyen",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Trafik cezaları şirket masrafı olarak kabul edilir mi?",
+      "reference_signals": [
+        "trafik cezaları masraf kabul edilmez"
+      ]
+    },
+    {
+      "id": "M012",
+      "category": "masraf",
+      "subcategory": "belge_kural",
+      "difficulty": "easy",
+      "question_type": "consequence",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Şirket kredi kartı ile kişisel harcama yapılabilir mi?",
+      "reference_signals": [
+        "şirket kredi kartı ile kişisel harcama yapılmamalı"
+      ]
+    },
+    {
+      "id": "M013",
+      "category": "masraf",
+      "subcategory": "ulasim",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Şirket aracı ayda en fazla kaç kez yıkatılabilir?",
+      "reference_signals": [
+        "araç yıkama ayda en fazla 2 defa"
+      ]
+    },
+    {
+      "id": "M014",
+      "category": "masraf",
+      "subcategory": "kabul_edilmeyen",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Yemek kartı ile yapılan harcamalar masraf olarak beyan edilebilir mi?",
+      "reference_signals": [
+        "yemek kartı ile yapılan harcama masraf yapılamaz"
+      ]
+    },
+    {
+      "id": "M015",
+      "category": "masraf",
+      "subcategory": "kabul_edilmeyen",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Evden çalışma (remote) sırasında yapılan internet veya elektrik gibi harcamalar masraf sayılır mı?",
+      "reference_signals": [
+        "remote çalışma harcamaları masraf değil"
+      ]
+    },
+    {
+      "id": "M016",
+      "category": "masraf",
+      "subcategory": "yiyecek_icecek",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Birden fazla kişiyi kapsayan yiyecek-içecek masraf formunda hangi bilgiler mutlaka yer almalı?",
+      "reference_signals": [
+        "kimler adına yapıldığı",
+        "masraf açıklaması",
+        "en üst seviye yönetici"
+      ]
+    },
+    {
+      "id": "M017",
+      "category": "masraf",
+      "subcategory": "belge_kural",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Şirket kredi kartı ekstresi sorunlu gelirse ne yapılmalıdır?",
+      "reference_signals": [
+        "finans ve muhasebeye bilgi verip banka ile temas"
+      ]
+    },
+    {
+      "id": "M018",
+      "category": "masraf",
+      "subcategory": "kabul_edilmeyen",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Çalışma saatleri içinde yenilen yemek masraf olarak gösterilebilir mi?",
+      "reference_signals": [
+        "çalışma saatleri içindeki harcamalar masraf değil"
+      ]
+    },
+    {
+      "id": "M019",
+      "category": "masraf",
+      "subcategory": "ulasim",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Taksi masrafı için hangi tür fiş/belge gereklidir?",
+      "reference_signals": [
+        "kaşeli taksi fişi",
+        "rota",
+        "açıklama",
+        "saat"
+      ]
+    },
+    {
+      "id": "M020",
+      "category": "masraf",
+      "subcategory": "belge_kural",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["masraf_uygulamasi"],
+      "question": "Masraf formuna eklenecek fatura ve belgelerde dikkat edilmesi gereken tüm kurallar nelerdir?",
+      "reference_signals": [
+        "belgeler net ve okunabilir",
+        "fatura bitaksi adına",
+        "slip tek başına yeterli değil",
+        "yemek kartı ile yapılan harcama masraf yapılamaz"
+      ]
+    },
+
+    {
+      "id": "S001",
+      "category": "seyahat",
+      "subcategory": "kapsam",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat prosedürünün amacı nedir ve kimleri kapsar?",
+      "reference_signals": [
+        "şehir dışı seyahati talep edilen veya gerekli olduğu bildirilen çalışanlar",
+        "seyahat harcama koşulları"
+      ]
+    },
+    {
+      "id": "S002",
+      "category": "seyahat",
+      "subcategory": "rezervasyon",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Tüm seyahat talepleri hangi kanal üzerinden ve hangi e-posta kurallarıyla iletilmeli?",
+      "reference_signals": [
+        "Tatilsepeti",
+        "@bitaksi.com uzantılı e-posta",
+        "People ekibi cc"
+      ]
+    },
+    {
+      "id": "S003",
+      "category": "seyahat",
+      "subcategory": "limitler",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Yurt içi uçak bileti ve otel masrafı için hangi tutar eşikleri uygulanıyor?",
+      "reference_signals": [
+        "otel gecelik 5.000 TL",
+        "yurt içi tek yön uçak bileti 3.000 TL"
+      ]
+    },
+    {
+      "id": "S004",
+      "category": "seyahat",
+      "subcategory": "onay",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Hangi seyahat harcamalarında sadece People onayı yeterli, hangi durumda CEO onayı gerekiyor?",
+      "reference_signals": [
+        "altında People onayı",
+        "üzerinde CEO onayı"
+      ]
+    },
+    {
+      "id": "S005",
+      "category": "seyahat",
+      "subcategory": "fatura",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat ödemeleri ve faturalar hangi şekilde ilerlemeli, bireysel faturalar kabul edilir mi?",
+      "reference_signals": [
+        "kurumsal fatura",
+        "bireysel faturalandırmalar kabul edilmez",
+        "muhasebe ekibi tarafından ödenir"
+      ]
+    },
+    {
+      "id": "S006",
+      "category": "seyahat",
+      "subcategory": "rezervasyon",
+      "difficulty": "hard",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Kurumsal e-postayla işlem yapılamayan acil durumda nasıl iletişim kurulabilir ve kim sürece dahil olmalı?",
+      "reference_signals": [
+        "kişisel e-posta ile iletişim",
+        "Halit Ergin",
+        "People ekibi",
+        "çalışan olduğunun onaylanması"
+      ]
+    },
+    {
+      "id": "S007",
+      "category": "seyahat",
+      "subcategory": "kapsam",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Şirketin kurumsal seyahat anlaşması bireysel kullanım için bilet veya otel rezervasyonu yapılmasında kullanılabilir mi?",
+      "reference_signals": [
+        "bireysel kullanım için kullanılamaz"
+      ]
+    },
+    {
+      "id": "S008",
+      "category": "seyahat",
+      "subcategory": "rezervasyon",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat taleplerinde kullanılması gereken e-posta adresi türü nedir?",
+      "reference_signals": [
+        "@bitaksi.com uzantılı e-posta"
+      ]
+    },
+    {
+      "id": "S009",
+      "category": "seyahat",
+      "subcategory": "onay",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Otel gecelik maliyeti ne kadar olduğunda CEO onayı gerekmektedir?",
+      "reference_signals": [
+        "5.000 TL",
+        "CEO onayı"
+      ]
+    },
+    {
+      "id": "S010",
+      "category": "seyahat",
+      "subcategory": "onay",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Yurt içi tek yön uçak bileti hangi fiyatın üzerinde olduğunda ekstra onay gerekir?",
+      "reference_signals": [
+        "3.000 TL",
+        "CEO onayı"
+      ]
+    },
+    {
+      "id": "S011",
+      "category": "seyahat",
+      "subcategory": "fatura",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat için otel rezervasyonu yapıldıktan sonra fatura kime ve nasıl düzenlenmeli?",
+      "reference_signals": [
+        "kurumsal fatura",
+        "bireysel faturalandırmalar kabul edilmez"
+      ]
+    },
+    {
+      "id": "S012",
+      "category": "seyahat",
+      "subcategory": "rezervasyon",
+      "difficulty": "hard",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat taleplerinin onaylanmasında People ekibi ve CEO onayı eşikleri nasıl belirlenmiştir?",
+      "reference_signals": [
+        "People onayı",
+        "CEO onayı",
+        "eşikler"
+      ]
+    },
+    {
+      "id": "S013",
+      "category": "seyahat",
+      "subcategory": "rezervasyon",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat rezervasyonu Tatilsepeti dışında bir kanaldan yapılabilir mi?",
+      "reference_signals": [
+        "Tatilsepeti",
+        "bireysel kullanım için kullanılamaz"
+      ]
+    },
+    {
+      "id": "S014",
+      "category": "seyahat",
+      "subcategory": "kapsam",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat prosedürü hangi tür seyahatleri kapsamaktadır?",
+      "reference_signals": [
+        "şehir dışı seyahat"
+      ]
+    },
+    {
+      "id": "S015",
+      "category": "seyahat",
+      "subcategory": "fatura",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru"],
+      "question": "Seyahat ödemeleri çalışan tarafından mı yoksa şirket tarafından mı karşılanır?",
+      "reference_signals": [
+        "muhasebe ekibi tarafından ödenir",
+        "kurumsal fatura"
+      ]
+    },
+
+    {
+      "id": "Z001",
+      "category": "zimmet",
+      "subcategory": "kapsam",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Zimmetli eşya kullanım prosedürünün amacı nedir ve uygulamadan kimler sorumludur?",
+      "reference_signals": [
+        "görevi gereği tahsis edilmesi gereken araç ve gereçler",
+        "İnsan Departmanı",
+        "Finans & Muhasebe",
+        "ilgili yönetici ve üst yöneticiler"
+      ]
+    },
+    {
+      "id": "Z002",
+      "category": "zimmet",
+      "subcategory": "tahsis",
+      "difficulty": "medium",
+      "question_type": "eligibility",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Cep telefonu ve şirket hattı kimlere ve hangi şartlarla tahsis edilir?",
+      "reference_signals": [
+        "üst yönetimin belirlediği pozisyonlar",
+        "belirlenen limitler dahilinde"
+      ]
+    },
+    {
+      "id": "Z003",
+      "category": "zimmet",
+      "subcategory": "tahsis",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Çalışan önerilen telefonlardan farklı bir cihaz almak isterse ne yapmalı?",
+      "reference_signals": [
+        "İnsan Departmanı ve IT Support onayı"
+      ]
+    },
+    {
+      "id": "Z004",
+      "category": "zimmet",
+      "subcategory": "tahsis",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Yeni işe başlayacak biri için şirket bilgisayarı talebi ne zaman ve hangi ekip tarafından iletilmeli?",
+      "reference_signals": [
+        "işe başlamadan en az bir hafta önce",
+        "İnsan Departmanı IT Support'a iletir"
+      ]
+    },
+    {
+      "id": "Z005",
+      "category": "zimmet",
+      "subcategory": "tahsis",
+      "difficulty": "hard",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Cihaz veya ekipman tahsis talepleri hangi kriterlere göre değerlendiriliyor?",
+      "reference_signals": [
+        "çalışanın unvanı",
+        "organizasyondaki yeri",
+        "üstlendiği fonksiyonlar",
+        "ihtiyaç"
+      ]
+    },
+    {
+      "id": "Z006",
+      "category": "zimmet",
+      "subcategory": "kurallar",
+      "difficulty": "hard",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Bir çalışana aynı veya birbirini ikame eden birden fazla cihaz aynı anda tahsis edilebilir mi?",
+      "reference_signals": [
+        "aynı cihaz birden fazla tahsis edilemez",
+        "ikame eşyalar aynı anda tahsis edilemez",
+        "istisna olarak Genel Müdür onayı veya görev gereksinimi"
+      ]
+    },
+    {
+      "id": "Z007",
+      "category": "zimmet",
+      "subcategory": "envanter",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Tahsis edilen bilgisayar ve BT ekipmanları hangi kayıtlarda tutuluyor ve nasıl kontrol ediliyor?",
+      "reference_signals": [
+        "Sabit Kıymet Listesi",
+        "BT demirbaş envanteri",
+        "yılda bir kez çapraz kontrol"
+      ]
+    },
+    {
+      "id": "Z008",
+      "category": "zimmet",
+      "subcategory": "kayip_hasar",
+      "difficulty": "hard",
+      "question_type": "threshold",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Zimmetli eşya kaybolursa veya çalınırsa kaç iş günü içinde rapor hazırlanmalı ve hangi ek belgeler istenebilir?",
+      "reference_signals": [
+        "en geç 1 iş günü",
+        "istisnai durumda 3 iş günü",
+        "hırsızlık halinde polis raporu"
+      ]
+    },
+    {
+      "id": "Z009",
+      "category": "zimmet",
+      "subcategory": "kurallar",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Şirketten ayrılan bir çalışan zimmetli eşyalarını nasıl iade etmelidir?",
+      "reference_signals": [
+        "zimmet",
+        "iade",
+        "İnsan Departmanı"
+      ]
+    },
+    {
+      "id": "Z010",
+      "category": "zimmet",
+      "subcategory": "kayip_hasar",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru"],
+      "question": "Şirket tarafından tahsis edilmiş bir ekipman hasar görürse çalışan ne yapmalıdır?",
+      "reference_signals": [
+        "hasar",
+        "rapor",
+        "İnsan Departmanı"
+      ]
+    },
+
+    {
+      "id": "X001",
+      "category": "multi_doc",
+      "subcategory": "seyahat_masraf",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru", "masraf_uygulamasi"],
+      "question": "Şehir dışı bir seyahatte kahvaltı masrafı yapılabilir mi, limit nedir ve masraf formunda nelere dikkat edilmelidir?",
+      "reference_signals": [
+        "kahvaltı",
+        "200 TL",
+        "fiş/fatura",
+        "açıklama"
+      ]
+    },
+    {
+      "id": "X002",
+      "category": "multi_doc",
+      "subcategory": "seyahat_masraf",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru", "masraf_uygulamasi"],
+      "question": "Bir iş seyahati için rezervasyon, onay ve faturalandırma süreci nasıl ilerlemeli?",
+      "reference_signals": [
+        "Tatilsepeti",
+        "kurumsal e-posta",
+        "People cc",
+        "eşiklere göre People veya CEO onayı",
+        "kurumsal fatura",
+        "bitaksi adına"
+      ]
+    },
+    {
+      "id": "X003",
+      "category": "multi_doc",
+      "subcategory": "zimmet_seyahat",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru", "seyahat_proseduru"],
+      "question": "Yeni işe başlayan bir çalışan hem şirket bilgisayarı hem de iş seyahati için hangi ekiplerle ve hangi süreçlerle ilerlemeli?",
+      "reference_signals": [
+        "bilgisayar talebi için İnsan Departmanı ve IT Support",
+        "seyahat için Tatilsepeti ve People ekibi"
+      ]
+    },
+    {
+      "id": "X004",
+      "category": "multi_doc",
+      "subcategory": "seyahat_masraf",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru", "masraf_uygulamasi"],
+      "question": "Bir iş seyahatinde belgelenmiş otel ve uçak bilet limitleri ile yiyecek-içecek limitleri nelerdir?",
+      "reference_signals": [
+        "otel gecelik 5.000 TL",
+        "yurt içi tek yön uçak bileti 3.000 TL",
+        "400 TL",
+        "200 TL"
+      ]
+    },
+    {
+      "id": "X005",
+      "category": "multi_doc",
+      "subcategory": "seyahat_masraf",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru", "masraf_uygulamasi"],
+      "question": "Seyahat sırasında late check-out için taksi tutarsam hangi koşullar geçerli ve masraf formuna ne eklemeliyim?",
+      "reference_signals": [
+        "21:00",
+        "kaşeli taksi fişi",
+        "rota",
+        "saat"
+      ]
+    },
+    {
+      "id": "X006",
+      "category": "multi_doc",
+      "subcategory": "performans_izin",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["performans_kilavuzu_2025", "izin_proseduru"],
+      "question": "Performans değerlendirme dönemi ve izin hakediş sistemi bir arada düşünüldüğünde, çalışan Ocak başında hem eşdeğer seçimi yapabilir hem de izin talebinde bulunabilir mi?",
+      "reference_signals": [
+        "2 Ocak",
+        "BambooHR",
+        "yönetici onayı"
+      ]
+    },
+    {
+      "id": "X007",
+      "category": "multi_doc",
+      "subcategory": "zimmet_masraf",
+      "difficulty": "hard",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["zimmetli_esya_proseduru", "masraf_uygulamasi"],
+      "question": "Şirket bilgisayarım hasar gördü ve tamir edilmesi gerekiyor. Hem zimmet hem de masraf süreçleri açısından nasıl bir yol izlemeliyim?",
+      "reference_signals": [
+        "hasar",
+        "İnsan Departmanı",
+        "belge",
+        "fatura"
+      ]
+    },
+    {
+      "id": "X008",
+      "category": "multi_doc",
+      "subcategory": "seyahat_masraf",
+      "difficulty": "medium",
+      "question_type": "synthesis",
+      "expected_outcome": "answerable",
+      "expected_docs": ["seyahat_proseduru", "masraf_uygulamasi"],
+      "question": "Seyahat prosedürü ve masraf uygulaması arasındaki ortak fatura/belge gereksinimleri nelerdir?",
+      "reference_signals": [
+        "kurumsal fatura",
+        "bitaksi adına",
+        "belgeler net ve okunabilir",
+        "bireysel faturalandırma kabul edilmez"
+      ]
+    },
+
+    {
+      "id": "A001",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Bitaksi'nin özel sağlık sigortası kapsamında hangi hastaneler var?",
+      "reference_signals": []
+    },
+    {
+      "id": "A002",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Yemek kartının aylık bakiye yükleme limiti kaç TL?",
+      "reference_signals": []
+    },
+    {
+      "id": "A003",
+      "category": "abstain",
+      "subcategory": "calisma_modeli",
+      "difficulty": "easy",
+      "question_type": "threshold",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Haftada kaç gün evden (remote) çalışma hakkım var?",
+      "reference_signals": []
+    },
+    {
+      "id": "A004",
+      "category": "abstain",
+      "subcategory": "maas_bant",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Bitaksi'de maaş bantları ve ücret yapısı nasıldır?",
+      "reference_signals": []
+    },
+    {
+      "id": "A005",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Yıllık performans bonusu hesaplama yöntemi nedir?",
+      "reference_signals": []
+    },
+    {
+      "id": "A006",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Bitaksi çalışanlarına hisse senedi opsiyonu (ESOP) veriliyor mu?",
+      "reference_signals": []
+    },
+    {
+      "id": "A007",
+      "category": "abstain",
+      "subcategory": "politikalar",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Şirketin kıyafet politikası nedir, formal mı casual mi giyinmek gerekiyor?",
+      "reference_signals": []
+    },
+    {
+      "id": "A008",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Eğitim ve kişisel gelişim için yıllık bütçe ne kadar?",
+      "reference_signals": []
+    },
+    {
+      "id": "A009",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Ofis otoparkını kullanabilir miyim, otopark ücreti şirket tarafından karşılanıyor mu?",
+      "reference_signals": []
+    },
+    {
+      "id": "A010",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "easy",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Spor salonu veya wellness programı desteği var mı?",
+      "reference_signals": []
+    },
+    {
+      "id": "A011",
+      "category": "abstain",
+      "subcategory": "maas_bant",
+      "difficulty": "medium",
+      "question_type": "threshold",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Terfiden sonra maaşımın ne kadar artacağını nasıl öğrenebilirim?",
+      "reference_signals": []
+    },
+    {
+      "id": "A012",
+      "category": "abstain",
+      "subcategory": "yan_haklar",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Çalışan öneri programı var mı, arkadaşımı önerirsem prim alır mıyım?",
+      "reference_signals": []
+    },
+    {
+      "id": "A013",
+      "category": "abstain",
+      "subcategory": "calisma_modeli",
+      "difficulty": "medium",
+      "question_type": "factual",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Esnek çalışma saati uygulaması var mı, saat 10'da işe gelebilir miyim?",
+      "reference_signals": []
+    },
+    {
+      "id": "A014",
+      "category": "abstain",
+      "subcategory": "politikalar",
+      "difficulty": "medium",
+      "question_type": "procedural",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "İşe alım (recruitment) süreci nasıl işliyor, bir pozisyon için başvurumu nereye yaparım?",
+      "reference_signals": []
+    },
+    {
+      "id": "A015",
+      "category": "abstain",
+      "subcategory": "maas_bant",
+      "difficulty": "hard",
+      "question_type": "procedural",
+      "expected_outcome": "abstain",
+      "expected_docs": [],
+      "question": "Kıdem tazminatım nasıl hesaplanır ve şirketten ayrılırsam ne zaman ödenir?",
+      "reference_signals": []
+    }
+  ]
+}
